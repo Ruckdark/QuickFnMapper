@@ -4,8 +4,9 @@ using QuickFnMapper.Core.Services;
 using QuickFnMapper.WinForms.Views.Interfaces;
 using System;
 using System.Collections.Generic;
-using System.Windows.Forms;
 using System.Diagnostics; // For Debug
+using System.Windows.Forms;
+using QuickFnMapper.WinForms.Utils; // 
 #endregion
 
 namespace QuickFnMapper.WinForms.Controllers
@@ -19,10 +20,10 @@ namespace QuickFnMapper.WinForms.Controllers
     public class SettingsController
     {
         #region Fields
-        private readonly ISettingsView _view;
-        private readonly IAppSettingsService _appSettingsService;
-        private AppSettings? _currentSettings; // Sửa: Cho phép nullable, sẽ được gán trong PrepareForSettings
-        private readonly MainController _mainController;
+        private readonly ISettingsView _view; // 
+        private readonly IAppSettingsService _appSettingsService; // 
+        private AppSettings? _currentSettings;
+        private readonly MainController _mainController; // 
         #endregion
 
         #region Constructors
@@ -32,175 +33,243 @@ namespace QuickFnMapper.WinForms.Controllers
         /// </summary>
         public SettingsController(ISettingsView view, IAppSettingsService appSettingsService, MainController mainController)
         {
-            _view = view ?? throw new ArgumentNullException(nameof(view));
-            _appSettingsService = appSettingsService ?? throw new ArgumentNullException(nameof(appSettingsService));
-            _mainController = mainController ?? throw new ArgumentNullException(nameof(mainController));
+            _view = view ?? throw new ArgumentNullException(nameof(view)); // 
+            _appSettingsService = appSettingsService ?? throw new ArgumentNullException(nameof(appSettingsService)); // 
+            _mainController = mainController ?? throw new ArgumentNullException(nameof(mainController)); // 
+
+            // KHÔNG ĐĂNG KÝ ViewInitialized ở đây nữa vì Controller sẽ chủ động populate View
+            // _view.ViewInitialized += OnViewInitializedByView; // 
 
             // Subscribe to view events
-            _view.ViewInitialized += OnViewInitializedByView; // Sửa: Đăng ký vào event của View
-            _view.SaveSettingsClicked += OnSaveSettingsClicked;
-            _view.CancelSettingsClicked += OnCancelSettingsClicked;
-            _view.BrowseRulesFilePathClicked += OnBrowseRulesFilePathClicked;
+            _view.SaveSettingsClicked += OnSaveSettingsClicked; // 
+            _view.CancelSettingsClicked += OnCancelSettingsClicked; // 
+            _view.BrowseRulesFilePathClicked += OnBrowseRulesFilePathClicked; // 
+            Debug.WriteLine("[INFO] SettingsController: Constructor finished, events subscribed.");
         }
         #endregion
 
         #region Public Methods
         /// <summary>
-        /// <para>Prepares the controller with the current application settings.</para>
-        /// <para>The actual data loading to the view happens when the view raises the ViewInitialized event.</para>
-        /// <para>Chuẩn bị controller với các cài đặt ứng dụng hiện tại.</para>
-        /// <para>Việc tải dữ liệu thực tế vào view xảy ra khi view kích hoạt sự kiện ViewInitialized.</para>
+        /// <para>Loads settings from the service and populates the view with this data.</para>
+        /// <para>Tải cài đặt từ dịch vụ và điền dữ liệu này vào view.</para>
         /// </summary>
-        public void PrepareForSettings()
+        public void LoadAndDisplaySettingsOnView()
         {
-            _currentSettings = _appSettingsService.LoadSettings(); // LoadSettings() đảm bảo trả về non-null
-            // Logic điền dữ liệu vào View sẽ được thực hiện trong OnViewInitializedByView
-            // khi View đã sẵn sàng và kích hoạt event ViewInitialized.
+            Debug.WriteLine("[INFO] SettingsController.LoadAndDisplaySettingsOnView: Entered method.");
+            if (_view == null)
+            {
+                Debug.WriteLine("[ERROR] SettingsController.LoadAndDisplaySettingsOnView: _view is NULL!");
+                return;
+            }
+            if (_appSettingsService == null)
+            {
+                Debug.WriteLine("[ERROR] SettingsController.LoadAndDisplaySettingsOnView: _appSettingsService is NULL!");
+                return;
+            }
+
+            try
+            {
+                _currentSettings = _appSettingsService.LoadSettings(); // 
+                if (_currentSettings == null)
+                {
+                    Debug.WriteLine("[WARN] SettingsController.LoadAndDisplaySettingsOnView: _currentSettings is null after LoadSettings. Using default settings.");
+                    _currentSettings = _appSettingsService.GetDefaultSettings(); // 
+                    if (_currentSettings == null)
+                    {
+                        Debug.WriteLine("[FATAL ERROR] SettingsController.LoadAndDisplaySettingsOnView: Failed to get default settings!");
+                        _view.ShowUserNotification("Failed to load default settings.", "Critical Error", MessageBoxIcon.Error);
+                        return;
+                    }
+                }
+                Debug.WriteLine("[INFO] SettingsController.LoadAndDisplaySettingsOnView: Settings loaded. Calling PopulateViewWithSettingsData.");
+                PopulateViewWithSettingsData();
+                Debug.WriteLine("[INFO] SettingsController.LoadAndDisplaySettingsOnView: PopulateViewWithSettingsData finished. Populating themes.");
+                var themes = new List<string> { "SystemDefault", "Light", "Dark" }; // 
+                _view.PopulateApplicationThemes(themes); // 
+                Debug.WriteLine("[INFO] SettingsController.LoadAndDisplaySettingsOnView: Themes populated and method finished.");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[FATAL EXCEPTION] SettingsController.LoadAndDisplaySettingsOnView: {ex.ToString()}");
+                _view.ShowUserNotification($"Error loading settings data: {ex.Message}", "Load Settings Error", MessageBoxIcon.Error); // 
+            }
         }
         #endregion
 
         #region Event Handlers from View
-
-        // This method is called when THE VIEW raises its ViewInitialized event
-        private void OnViewInitializedByView(object? sender, EventArgs e) // Sửa: object? sender
+        private void OnSaveSettingsClicked(object? sender, EventArgs e) // 
         {
-            if (_currentSettings == null) // Kiểm tra phòng trường hợp PrepareForSettings chưa được gọi hoặc LoadSettings lỗi
-            {
-                Debug.WriteLine("[WARN] SettingsController: _currentSettings is null in OnViewInitializedByView. Loading default settings.");
-                _currentSettings = _appSettingsService.GetDefaultSettings(); // LoadSettings() đã có fallback về default
-            }
-            PopulateViewWithSettingsData();
-
-            var themes = new List<string> { "SystemDefault", "Light", "Dark" };
-            _view.PopulateApplicationThemes(themes);
-        }
-
-        private void OnSaveSettingsClicked(object? sender, EventArgs e) // Sửa: object? sender
-        {
+            Debug.WriteLine("[INFO] SettingsController.OnSaveSettingsClicked: Entered.");
             if (_currentSettings == null)
             {
-                _view.ShowUserNotification("Cannot save settings: current settings data is missing.", "Internal Error", MessageBoxIcon.Error);
+                _view.ShowUserNotification("Cannot save settings: current settings data is missing.", "Internal Error", MessageBoxIcon.Error); // 
                 return;
             }
 
-            if (!ValidateSettingsInput())
+            if (!ValidateSettingsInput()) // 
             {
+                Debug.WriteLine("[WARN] SettingsController.OnSaveSettingsClicked: Validation failed.");
                 return;
             }
 
-            _currentSettings.StartWithWindows = _view.StartWithWindows;
-            _currentSettings.IsGlobalHookEnabled = _view.IsGlobalHookEnabledView;
-            _currentSettings.MinimizeToTrayOnClose = _view.MinimizeToTrayOnClose;
-            _currentSettings.ShowNotifications = _view.ShowNotifications;
-            _currentSettings.RulesFilePath = _view.RulesFilePathView;
-            _currentSettings.ApplicationTheme = _view.ApplicationThemeView;
+            bool previousStartWithWindows = _currentSettings.StartWithWindows; // 
+
+            // Lấy giá trị từ View
+            _currentSettings.StartWithWindows = _view.StartWithWindows; // 
+            _currentSettings.IsGlobalHookEnabled = _view.IsGlobalHookEnabledView; // 
+            _currentSettings.MinimizeToTrayOnClose = _view.MinimizeToTrayOnClose; // 
+            _currentSettings.ShowNotifications = _view.ShowNotifications; // 
+            _currentSettings.RulesFilePath = _view.RulesFilePathView; // 
+            _currentSettings.ApplicationTheme = _view.ApplicationThemeView; // 
+            Debug.WriteLine("[INFO] SettingsController.OnSaveSettingsClicked: Settings collected from view.");
 
             try
             {
-                _appSettingsService.SaveSettings(_currentSettings);
-                _mainController.SettingsEditorSaved();
-                _view.ShowUserNotification("Settings saved successfully.", "Settings Saved", MessageBoxIcon.Information);
-                _view.CloseView(true);
+                _appSettingsService.SaveSettings(_currentSettings); // 
+                Debug.WriteLine("[INFO] SettingsController.OnSaveSettingsClicked: Settings saved via AppSettingsService.");
+
+                if (_currentSettings.StartWithWindows != previousStartWithWindows) // 
+                {
+                    Debug.WriteLine($"[INFO] SettingsController.OnSaveSettingsClicked: StartWithWindows changed from {previousStartWithWindows} to {_currentSettings.StartWithWindows}. Updating registry.");
+                    try
+                    {
+                        StartupRegistryHelper.SetStartup(_currentSettings.StartWithWindows); // 
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[ERROR] SettingsController.OnSaveSettingsClicked: Failed to update 'Start with Windows' setting in registry. {ex.Message}");
+                        _view.ShowUserNotification($"Failed to update 'Start with Windows' setting: {ex.Message}", "Startup Setting Error", MessageBoxIcon.Error); // 
+                        _currentSettings.StartWithWindows = previousStartWithWindows; // 
+                        _view.StartWithWindows = previousStartWithWindows; // Revert UI
+                        _appSettingsService.SaveSettings(_currentSettings); // Save reverted setting
+                    }
+                }
+                _mainController.SettingsEditorSaved(); // 
+                // _view.ShowUserNotification("Settings saved successfully.", "Settings Saved", MessageBoxIcon.Information); // lặp thông báo
+                _view.CloseView(true); // 
+                Debug.WriteLine("[INFO] SettingsController.OnSaveSettingsClicked: Save process completed.");
             }
             catch (Exception ex)
             {
-                _view.ShowUserNotification($"An unexpected error occurred while saving settings: {ex.Message}", "Save Error", MessageBoxIcon.Error);
+                Debug.WriteLine($"[FATAL EXCEPTION] SettingsController.OnSaveSettingsClicked: {ex.ToString()}");
+                _view.ShowUserNotification($"An unexpected error occurred while saving settings: {ex.Message}", "Save Error", MessageBoxIcon.Error); // 
             }
         }
 
-        private void OnCancelSettingsClicked(object? sender, EventArgs e) // Sửa: object? sender
+        private void OnCancelSettingsClicked(object? sender, EventArgs e) // 
         {
-            _view.CloseView(false);
+            Debug.WriteLine("[INFO] SettingsController.OnCancelSettingsClicked: Entered. Closing view.");
+            _view.CloseView(false); // 
         }
 
-        private void OnBrowseRulesFilePathClicked(object? sender, EventArgs e) // Sửa: object? sender
+        private void OnBrowseRulesFilePathClicked(object? sender, EventArgs e) // 
         {
-            // Logic để mở SaveFileDialog hoặc OpenFileDialog cho phép người dùng chọn đường dẫn mới
-            // Cần đảm bảo rằng View (SettingsControl) sẽ là parent của dialog này, hoặc có cách xử lý focus đúng.
-            // Để Controller không phụ thuộc trực tiếp vào System.Windows.Forms.SaveFileDialog,
-            // tốt nhất là ISettingsView có một phương thức: string? PromptForRulesFilePath(string initialPath);
-            // Controller sẽ gọi phương thức đó của View.
-            // Tạm thời giữ logic đơn giản để minh họa:
-            using (var sfd = new SaveFileDialog())
+            Debug.WriteLine("[INFO] SettingsController.OnBrowseRulesFilePathClicked: Entered.");
+            try
             {
-                sfd.Filter = "JSON Files (*.json)|*.json|All Files (*.*)|*.*";
-                sfd.Title = "Select Key Mappings File Path";
-
-                // Lấy đường dẫn hiện tại từ view để làm giá trị mặc định cho dialog
-                string currentPath = _view.RulesFilePathView;
-                if (!string.IsNullOrWhiteSpace(currentPath))
+                using (var sfd = new SaveFileDialog()) // 
                 {
-                    try
+                    sfd.Filter = "JSON Files (*.json)|*.json|All Files (*.*)|*.*"; // 
+                    sfd.Title = "Select Key Mappings File Path"; // 
+
+                    string currentPath = _view.RulesFilePathView; // 
+                    if (!string.IsNullOrWhiteSpace(currentPath))
                     {
-                        sfd.FileName = System.IO.Path.GetFileName(currentPath);
-                        sfd.InitialDirectory = System.IO.Path.GetDirectoryName(currentPath);
+                        try
+                        {
+                            sfd.FileName = System.IO.Path.GetFileName(currentPath); // 
+                            sfd.InitialDirectory = System.IO.Path.GetDirectoryName(currentPath); // 
+                        }
+                        catch (ArgumentException argEx) // 
+                        {
+                            Debug.WriteLine($"[WARN] SettingsController.OnBrowseRulesFilePathClicked: Invalid current path '{currentPath}'. {argEx.Message}");
+                        }
                     }
-                    catch (ArgumentException) // Path không hợp lệ
+
+                    Form? parentForm = (_view as Control)?.FindForm(); // 
+                    DialogResult result = (parentForm != null) ? sfd.ShowDialog(parentForm) : sfd.ShowDialog(); // 
+
+                    if (result == DialogResult.OK)
                     {
-                        // Bỏ qua, dùng mặc định của dialog
+                        Debug.WriteLine($"[INFO] SettingsController.OnBrowseRulesFilePathClicked: New rules file path selected: '{sfd.FileName}'");
+                        _view.RulesFilePathView = sfd.FileName; // 
                     }
-                }
-
-
-                // Đây là cách gọi dialog không lý tưởng từ Controller.
-                // View nên tự quản lý việc hiển thị dialog.
-                Form? parentForm = (_view as Control)?.FindForm(); // Cố gắng tìm form cha
-                DialogResult result = (parentForm != null) ? sfd.ShowDialog(parentForm) : sfd.ShowDialog();
-
-                if (result == DialogResult.OK)
-                {
-                    _view.RulesFilePathView = sfd.FileName;
+                    else
+                    {
+                        Debug.WriteLine("[INFO] SettingsController.OnBrowseRulesFilePathClicked: Browse dialog cancelled.");
+                    }
                 }
             }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ERROR] SettingsController.OnBrowseRulesFilePathClicked: Exception occurred. {ex.ToString()}");
+                _view.ShowUserNotification($"Error Browse for file: {ex.Message}", "Browse Error", MessageBoxIcon.Error);
+            }
         }
-
         #endregion
 
         #region Private Helper Methods
-
         private void PopulateViewWithSettingsData()
         {
-            if (_currentSettings == null) return; // Kiểm tra null
+            Debug.WriteLine("[INFO] SettingsController.PopulateViewWithSettingsData: Entered method.");
+            if (_currentSettings == null) { Debug.WriteLine("[ERROR] SettingsController.PopulateViewWithSettingsData: _currentSettings is NULL."); return; }
+            if (_view == null) { Debug.WriteLine("[ERROR] SettingsController.PopulateViewWithSettingsData: _view is NULL."); return; }
 
-            _view.StartWithWindows = _currentSettings.StartWithWindows;
-            _view.IsGlobalHookEnabledView = _currentSettings.IsGlobalHookEnabled;
-            _view.MinimizeToTrayOnClose = _currentSettings.MinimizeToTrayOnClose;
-            _view.ShowNotifications = _currentSettings.ShowNotifications;
-            // RulesFilePath và ApplicationTheme trong _currentSettings đã được đảm bảo non-null bởi AppSettings constructor
-            _view.RulesFilePathView = _currentSettings.RulesFilePath;
-            _view.ApplicationThemeView = _currentSettings.ApplicationTheme;
+            Debug.WriteLine($"[INFO] SettingsController.PopulateViewWithSettingsData: Applying StartWithWindows = {_currentSettings.StartWithWindows}");
+            _view.StartWithWindows = _currentSettings.StartWithWindows; // 
+
+            Debug.WriteLine($"[INFO] SettingsController.PopulateViewWithSettingsData: Applying IsGlobalHookEnabledView = {_currentSettings.IsGlobalHookEnabled}");
+            _view.IsGlobalHookEnabledView = _currentSettings.IsGlobalHookEnabled; // 
+
+            Debug.WriteLine($"[INFO] SettingsController.PopulateViewWithSettingsData: Applying MinimizeToTrayOnClose = {_currentSettings.MinimizeToTrayOnClose}");
+            _view.MinimizeToTrayOnClose = _currentSettings.MinimizeToTrayOnClose; // 
+
+            Debug.WriteLine($"[INFO] SettingsController.PopulateViewWithSettingsData: Applying ShowNotifications = {_currentSettings.ShowNotifications}");
+            _view.ShowNotifications = _currentSettings.ShowNotifications; // 
+
+            Debug.WriteLine($"[INFO] SettingsController.PopulateViewWithSettingsData: Applying RulesFilePathView = '{_currentSettings.RulesFilePath}'");
+            _view.RulesFilePathView = _currentSettings.RulesFilePath; // 
+
+            Debug.WriteLine($"[INFO] SettingsController.PopulateViewWithSettingsData: Applying ApplicationThemeView = '{_currentSettings.ApplicationTheme}'");
+            _view.ApplicationThemeView = _currentSettings.ApplicationTheme; // 
+            Debug.WriteLine("[INFO] SettingsController.PopulateViewWithSettingsData: Finished applying settings to view properties.");
         }
 
         private bool ValidateSettingsInput()
         {
-            if (string.IsNullOrWhiteSpace(_view.RulesFilePathView))
+            Debug.WriteLine("[INFO] SettingsController.ValidateSettingsInput: Entered.");
+            if (string.IsNullOrWhiteSpace(_view.RulesFilePathView)) // 
             {
-                _view.ShowUserNotification("Rules file path cannot be empty.", "Validation Error", MessageBoxIcon.Warning);
+                _view.ShowUserNotification("Rules file path cannot be empty.", "Validation Error", MessageBoxIcon.Warning); // 
+                Debug.WriteLine("[WARN] SettingsController.ValidateSettingsInput: RulesFilePathView is empty.");
                 return false;
             }
             try
             {
                 // Kiểm tra xem đường dẫn có hợp lệ không (không nhất thiết file phải tồn tại ngay lúc này)
-                // FileInfo sẽ ném lỗi nếu path chứa ký tự không hợp lệ.
-                var fi = new System.IO.FileInfo(_view.RulesFilePathView);
+                var fi = new System.IO.FileInfo(_view.RulesFilePathView); // 
+                Debug.WriteLine($"[INFO] SettingsController.ValidateSettingsInput: RulesFilePathView ('{_view.RulesFilePathView}') seems valid.");
             }
-            catch (ArgumentException ex) // Path không hợp lệ
+            catch (ArgumentException ex) // 
             {
-                _view.ShowUserNotification($"Invalid rules file path (ArgumentException): {ex.Message}", "Validation Error", MessageBoxIcon.Warning);
+                _view.ShowUserNotification($"Invalid rules file path (ArgumentException): {ex.Message}", "Validation Error", MessageBoxIcon.Warning); // 
+                Debug.WriteLine($"[WARN] SettingsController.ValidateSettingsInput: Invalid RulesFilePathView (ArgumentException). {ex.Message}");
                 return false;
             }
-            catch (PathTooLongException ex)
+            catch (System.IO.PathTooLongException ex) // 
             {
-                _view.ShowUserNotification($"Invalid rules file path (PathTooLongException): {ex.Message}", "Validation Error", MessageBoxIcon.Warning);
+                _view.ShowUserNotification($"Invalid rules file path (PathTooLongException): {ex.Message}", "Validation Error", MessageBoxIcon.Warning); // 
+                Debug.WriteLine($"[WARN] SettingsController.ValidateSettingsInput: Invalid RulesFilePathView (PathTooLongException). {ex.Message}");
                 return false;
             }
-            catch (NotSupportedException ex) // Path có dạng không được hỗ trợ (VD: UNC mà không có UseShellExecute)
+            catch (NotSupportedException ex) // 
             {
-                _view.ShowUserNotification($"Invalid rules file path (NotSupportedException): {ex.Message}", "Validation Error", MessageBoxIcon.Warning);
+                _view.ShowUserNotification($"Invalid rules file path (NotSupportedException): {ex.Message}", "Validation Error", MessageBoxIcon.Warning); // 
+                Debug.WriteLine($"[WARN] SettingsController.ValidateSettingsInput: Invalid RulesFilePathView (NotSupportedException). {ex.Message}");
                 return false;
             }
-
-            return true;
+            Debug.WriteLine("[INFO] SettingsController.ValidateSettingsInput: Validation successful.");
+            return true; // 
         }
         #endregion
     }

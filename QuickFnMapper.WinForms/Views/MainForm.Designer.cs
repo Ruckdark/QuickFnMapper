@@ -1,29 +1,29 @@
-﻿namespace QuickFnMapper.WinForms.Views
+﻿// File: QuickFnMapper.WinForms/Views/MainForm.Designer.cs
+
+// Đảm bảo các using directives cần thiết đã có ở đầu file
+using System.Windows.Forms;
+using System.Drawing;
+
+namespace QuickFnMapper.WinForms.Views
 {
     partial class MainForm
     {
         /// <summary>
-        /// <para>Required designer variable.</para>
-        /// <para>Biến thiết kế bắt buộc.</para>
+        /// Required designer variable.
         /// </summary>
         private System.ComponentModel.IContainer components = null;
 
         /// <summary>
-        /// <para>Clean up any resources being used.</para>
-        /// <para>Dọn dẹp mọi tài nguyên đang được sử dụng.</para>
+        /// Clean up any resources being used.
         /// </summary>
-        /// <param name="disposing">
-        /// <para>true if managed resources should be disposed; otherwise, false.</para>
-        /// <para>true nếu các tài nguyên được quản lý nên được giải phóng; ngược lại, false.</para>
-        /// </param>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
         protected override void Dispose(bool disposing)
         {
             if (disposing && (components != null))
             {
                 components.Dispose();
             }
-            // Quan trọng: Giải phóng GlobalHookService nếu nó được MainForm sở hữu và khởi tạo
-            if (disposing && (_globalHookService != null)) // _globalHookService là field trong MainForm.cs
+            if (disposing && (_globalHookService != null)) // Giả sử _globalHookService được khai báo trong MainForm.cs
             {
                 _globalHookService.Dispose();
             }
@@ -33,22 +33,17 @@
         #region Windows Form Designer generated code
 
         /// <summary>
-        /// <para>Required method for Designer support - do not modify</para>
-        /// <para>the contents of this method with the code editor.</para>
-        /// <para>Phương thức bắt buộc cho hỗ trợ Designer - không sửa đổi</para>
-        /// <para>nội dung của phương thức này bằng trình soạn thảo mã.</para>
+        /// Required method for Designer support - do not modify
+        /// the contents of this method with the code editor.
         /// </summary>
+        // File: QuickFnMapper.WinForms/Views/MainForm.Designer.cs
+
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
-            System.Windows.Forms.ListViewItem listViewItem1 = new System.Windows.Forms.ListViewItem(new string[] {
-            "Yes",
-            "Sample Rule 1",
-            "Ctrl + Shift + A",
-            "Run Application: notepad.exe",
-            "0",
-            "29/05/2025 10:00"}, -1);
-            this.menuStripMain = new System.Windows.Forms.MenuStrip();
+            System.Windows.Forms.ListViewItem listViewItem1 = new System.Windows.Forms.ListViewItem(new string[] { "Yes", "Sample Rule (Designer File)", "Ctrl + Shift + X", "Run Application: explorer.exe", "0", System.DateTime.Now.ToString("g") }, -1);
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
+            this.mainMenuStrip = new System.Windows.Forms.MenuStrip();
             this.fileToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.exitToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
             this.rulesToolStripMenuItem = new System.Windows.Forms.ToolStripMenuItem();
@@ -82,39 +77,48 @@
             this.colTargetAction = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.colOrder = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
             this.colLastModified = ((System.Windows.Forms.ColumnHeader)(new System.Windows.Forms.ColumnHeader()));
-            this.menuStripMain.SuspendLayout();
+            this.trayNotifyIcon = new System.Windows.Forms.NotifyIcon(this.components);
+            this.trayContextMenuStrip = new System.Windows.Forms.ContextMenuStrip(this.components);
+            this.showToolStripMenuItemTray = new System.Windows.Forms.ToolStripMenuItem();
+            this.traySeparator1 = new System.Windows.Forms.ToolStripSeparator();
+            this.toggleServiceTrayMenuItem = new System.Windows.Forms.ToolStripMenuItem();
+            this.exitToolStripMenuItemTray = new System.Windows.Forms.ToolStripMenuItem();
+            this.mainMenuStrip.SuspendLayout();
             this.toolStripMain.SuspendLayout();
             this.statusStripMain.SuspendLayout();
-            this.pnlMainContent.SuspendLayout(); // Panel sẽ chứa ListView hoặc các UserControl khác
+            this.pnlMainContent.SuspendLayout();
+            this.trayContextMenuStrip.SuspendLayout();
             this.SuspendLayout();
             // 
-            // menuStripMain
+            // mainMenuStrip
             // 
-            this.menuStripMain.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+            this.mainMenuStrip.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.mainMenuStrip.ImageScalingSize = new System.Drawing.Size(20, 20);
+            this.mainMenuStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.fileToolStripMenuItem,
             this.rulesToolStripMenuItem,
             this.serviceToolStripMenuItem,
             this.toolsToolStripMenuItem,
             this.helpToolStripMenuItem});
-            this.menuStripMain.Location = new System.Drawing.Point(0, 0);
-            this.menuStripMain.Name = "menuStripMain";
-            this.menuStripMain.Size = new System.Drawing.Size(784, 24);
-            this.menuStripMain.TabIndex = 0;
-            this.menuStripMain.Text = "menuStrip1";
+            this.mainMenuStrip.Location = new System.Drawing.Point(0, 0);
+            this.mainMenuStrip.Name = "mainMenuStrip";
+            this.mainMenuStrip.Size = new System.Drawing.Size(884, 28);
+            this.mainMenuStrip.TabIndex = 0;
+            this.mainMenuStrip.Text = "menuStrip1";
             // 
             // fileToolStripMenuItem
             // 
             this.fileToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.exitToolStripMenuItem});
             this.fileToolStripMenuItem.Name = "fileToolStripMenuItem";
-            this.fileToolStripMenuItem.Size = new System.Drawing.Size(37, 20);
+            this.fileToolStripMenuItem.Size = new System.Drawing.Size(46, 24);
             this.fileToolStripMenuItem.Text = "&File";
             // 
             // exitToolStripMenuItem
             // 
             this.exitToolStripMenuItem.Name = "exitToolStripMenuItem";
             this.exitToolStripMenuItem.ShortcutKeys = ((System.Windows.Forms.Keys)((System.Windows.Forms.Keys.Alt | System.Windows.Forms.Keys.F4)));
-            this.exitToolStripMenuItem.Size = new System.Drawing.Size(135, 22);
+            this.exitToolStripMenuItem.Size = new System.Drawing.Size(169, 26);
             this.exitToolStripMenuItem.Text = "E&xit";
             this.exitToolStripMenuItem.Click += new System.EventHandler(this.exitToolStripMenuItem_Click);
             // 
@@ -125,77 +129,80 @@
             this.editRuleToolStripMenuItem,
             this.deleteRuleToolStripMenuItem});
             this.rulesToolStripMenuItem.Name = "rulesToolStripMenuItem";
-            this.rulesToolStripMenuItem.Size = new System.Drawing.Size(47, 20);
+            this.rulesToolStripMenuItem.Size = new System.Drawing.Size(59, 24);
             this.rulesToolStripMenuItem.Text = "&Rules";
             // 
             // addRuleToolStripMenuItem
             // 
             this.addRuleToolStripMenuItem.Name = "addRuleToolStripMenuItem";
-            this.addRuleToolStripMenuItem.Size = new System.Drawing.Size(131, 22);
+            this.addRuleToolStripMenuItem.Size = new System.Drawing.Size(176, 26); // VS Sẽ tự tính lại size
             this.addRuleToolStripMenuItem.Text = "&Add Rule...";
-            this.addRuleToolStripMenuItem.Click += new System.EventHandler(this.tsbAddRule_Click); // Dùng lại handler của ToolStripButton
+            this.addRuleToolStripMenuItem.Click += new System.EventHandler(this.tsbAddRule_Click);
             // 
             // editRuleToolStripMenuItem
             // 
             this.editRuleToolStripMenuItem.Name = "editRuleToolStripMenuItem";
-            this.editRuleToolStripMenuItem.Size = new System.Drawing.Size(131, 22);
+            this.editRuleToolStripMenuItem.Size = new System.Drawing.Size(176, 26); // VS Sẽ tự tính lại size
             this.editRuleToolStripMenuItem.Text = "&Edit Rule...";
-            this.editRuleToolStripMenuItem.Click += new System.EventHandler(this.tsbEditRule_Click); // Dùng lại handler
+            this.editRuleToolStripMenuItem.Click += new System.EventHandler(this.tsbEditRule_Click);
             // 
             // deleteRuleToolStripMenuItem
             // 
             this.deleteRuleToolStripMenuItem.Name = "deleteRuleToolStripMenuItem";
-            this.deleteRuleToolStripMenuItem.Size = new System.Drawing.Size(131, 22);
+            this.deleteRuleToolStripMenuItem.Size = new System.Drawing.Size(176, 26); // VS Sẽ tự tính lại size
             this.deleteRuleToolStripMenuItem.Text = "&Delete Rule";
-            this.deleteRuleToolStripMenuItem.Click += new System.EventHandler(this.tsbDeleteRule_Click); // Dùng lại handler
+            this.deleteRuleToolStripMenuItem.Click += new System.EventHandler(this.tsbDeleteRule_Click);
             // 
             // serviceToolStripMenuItem
             // 
             this.serviceToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.toggleServiceToolStripMenuItem});
             this.serviceToolStripMenuItem.Name = "serviceToolStripMenuItem";
-            this.serviceToolStripMenuItem.Size = new System.Drawing.Size(56, 20);
+            this.serviceToolStripMenuItem.Size = new System.Drawing.Size(70, 24);
             this.serviceToolStripMenuItem.Text = "&Service";
             // 
             // toggleServiceToolStripMenuItem
             // 
+            this.toggleServiceToolStripMenuItem.CheckOnClick = true;
             this.toggleServiceToolStripMenuItem.Name = "toggleServiceToolStripMenuItem";
-            this.toggleServiceToolStripMenuItem.Size = new System.Drawing.Size(150, 22);
-            this.toggleServiceToolStripMenuItem.Text = "&Enable Service"; // Text sẽ được cập nhật
-            this.toggleServiceToolStripMenuItem.Click += new System.EventHandler(this.tsbToggleService_Click); // Dùng lại handler
+            this.toggleServiceToolStripMenuItem.Size = new System.Drawing.Size(188, 26); // VS Sẽ tự tính lại size
+            this.toggleServiceToolStripMenuItem.Text = "&Enable Service";
+            this.toggleServiceToolStripMenuItem.Click += new System.EventHandler(this.tsbToggleService_Click);
             // 
             // toolsToolStripMenuItem
             // 
             this.toolsToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.settingsToolStripMenuItem});
             this.toolsToolStripMenuItem.Name = "toolsToolStripMenuItem";
-            this.toolsToolStripMenuItem.Size = new System.Drawing.Size(46, 20);
+            this.toolsToolStripMenuItem.Size = new System.Drawing.Size(58, 24);
             this.toolsToolStripMenuItem.Text = "&Tools";
             // 
             // settingsToolStripMenuItem
             // 
             this.settingsToolStripMenuItem.Name = "settingsToolStripMenuItem";
-            this.settingsToolStripMenuItem.Size = new System.Drawing.Size(125, 22);
+            this.settingsToolStripMenuItem.Size = new System.Drawing.Size(155, 26); // VS Sẽ tự tính lại size
             this.settingsToolStripMenuItem.Text = "&Settings...";
-            this.settingsToolStripMenuItem.Click += new System.EventHandler(this.tsbSettings_Click); // Dùng lại handler
+            this.settingsToolStripMenuItem.Click += new System.EventHandler(this.tsbSettings_Click);
             // 
             // helpToolStripMenuItem
             // 
             this.helpToolStripMenuItem.DropDownItems.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.aboutToolStripMenuItem});
             this.helpToolStripMenuItem.Name = "helpToolStripMenuItem";
-            this.helpToolStripMenuItem.Size = new System.Drawing.Size(44, 20);
+            this.helpToolStripMenuItem.Size = new System.Drawing.Size(55, 24);
             this.helpToolStripMenuItem.Text = "&Help";
             // 
             // aboutToolStripMenuItem
             // 
             this.aboutToolStripMenuItem.Name = "aboutToolStripMenuItem";
-            this.aboutToolStripMenuItem.Size = new System.Drawing.Size(116, 22);
+            this.aboutToolStripMenuItem.Size = new System.Drawing.Size(142, 26); // VS Sẽ tự tính lại size
             this.aboutToolStripMenuItem.Text = "&About...";
-            // this.aboutToolStripMenuItem.Click += new System.EventHandler(this.aboutToolStripMenuItem_Click); // Cần tạo handler nếu có
             // 
             // toolStripMain
             // 
+            this.toolStripMain.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.toolStripMain.GripStyle = System.Windows.Forms.ToolStripGripStyle.Hidden;
+            this.toolStripMain.ImageScalingSize = new System.Drawing.Size(32, 32); // *** Đặt kích thước icon mong muốn ***
             this.toolStripMain.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
             this.tsbShowHome,
             this.toolStripSeparator3,
@@ -206,143 +213,154 @@
             this.tsbToggleService,
             this.toolStripSeparator2,
             this.tsbSettings});
-            this.toolStripMain.Location = new System.Drawing.Point(0, 24);
+            this.toolStripMain.Location = new System.Drawing.Point(0, 28);
             this.toolStripMain.Name = "toolStripMain";
-            this.toolStripMain.Size = new System.Drawing.Size(784, 25);
+            this.toolStripMain.Padding = new System.Windows.Forms.Padding(0, 0, 2, 0);
+            this.toolStripMain.Size = new System.Drawing.Size(884, 31); // Chiều cao có thể tự điều chỉnh (ví dụ 24 + padding)
             this.toolStripMain.TabIndex = 1;
             this.toolStripMain.Text = "toolStrip1";
             // 
             // tsbShowHome
             // 
-            this.tsbShowHome.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image; // Hoặc Text
-            // this.tsbShowHome.Image = ((System.Drawing.Image)(resources.GetObject("tsbShowHome.Image"))); // Cần hình ảnh
+            this.tsbShowHome.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image; // *** SỬA ***
+            this.tsbShowHome.Image = global::QuickFnMapper.Properties.Resources.HomeIcon; // *** SỬA ***
             this.tsbShowHome.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.tsbShowHome.Name = "tsbShowHome";
-            this.tsbShowHome.Size = new System.Drawing.Size(23, 22);
-            this.tsbShowHome.Text = "Show Home Screen";
-            this.tsbShowHome.Click += new System.EventHandler(this.tsbShowHome_Click); // Cần tạo handler
+            this.tsbShowHome.Size = new System.Drawing.Size(29, 28); // Kích thước sẽ theo ImageScalingSize
+            this.tsbShowHome.Text = ""; // *** SỬA ***
+            this.tsbShowHome.ToolTipText = "Show Home Screen"; // *** SỬA ***
+            this.tsbShowHome.Click += new System.EventHandler(this.tsbShowHome_Click);
             // 
             // toolStripSeparator3
             // 
             this.toolStripSeparator3.Name = "toolStripSeparator3";
-            this.toolStripSeparator3.Size = new System.Drawing.Size(6, 25);
-            // 
-            // tsbAddRule
-            // 
-            this.tsbAddRule.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            // this.tsbAddRule.Image = ((System.Drawing.Image)(resources.GetObject("tsbAddRule.Image")));
+            this.toolStripSeparator3.Size = new System.Drawing.Size(6, 31); // Chiều cao theo toolstrip
+                                                                            // 
+                                                                            // tsbAddRule
+                                                                            // 
+            this.tsbAddRule.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image; // *** SỬA ***
+            this.tsbAddRule.Image = global::QuickFnMapper.Properties.Resources.AddRuleIcon; // *** SỬA ***
             this.tsbAddRule.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.tsbAddRule.Name = "tsbAddRule";
-            this.tsbAddRule.Size = new System.Drawing.Size(23, 22);
-            this.tsbAddRule.Text = "Add New Rule";
+            this.tsbAddRule.Size = new System.Drawing.Size(29, 28);
+            this.tsbAddRule.Text = ""; // *** SỬA ***
+            this.tsbAddRule.ToolTipText = "Add New Rule"; // *** SỬA ***
             this.tsbAddRule.Click += new System.EventHandler(this.tsbAddRule_Click);
             // 
             // tsbEditRule
             // 
-            this.tsbEditRule.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            // this.tsbEditRule.Image = ((System.Drawing.Image)(resources.GetObject("tsbEditRule.Image")));
+            this.tsbEditRule.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image; // *** SỬA ***
+            this.tsbEditRule.Image = global::QuickFnMapper.Properties.Resources.EditRuleIcon; // *** SỬA ***
             this.tsbEditRule.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.tsbEditRule.Name = "tsbEditRule";
-            this.tsbEditRule.Size = new System.Drawing.Size(23, 22);
-            this.tsbEditRule.Text = "Edit Selected Rule";
+            this.tsbEditRule.Size = new System.Drawing.Size(29, 28);
+            this.tsbEditRule.Text = ""; // *** SỬA ***
+            this.tsbEditRule.ToolTipText = "Edit Selected Rule"; // *** SỬA ***
             this.tsbEditRule.Click += new System.EventHandler(this.tsbEditRule_Click);
             // 
             // tsbDeleteRule
             // 
-            this.tsbDeleteRule.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            // this.tsbDeleteRule.Image = ((System.Drawing.Image)(resources.GetObject("tsbDeleteRule.Image")));
+            this.tsbDeleteRule.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image; // *** SỬA ***
+            this.tsbDeleteRule.Image = global::QuickFnMapper.Properties.Resources.DeleteRuleIcon; // *** SỬA ***
             this.tsbDeleteRule.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.tsbDeleteRule.Name = "tsbDeleteRule";
-            this.tsbDeleteRule.Size = new System.Drawing.Size(23, 22);
-            this.tsbDeleteRule.Text = "Delete Selected Rule";
+            this.tsbDeleteRule.Size = new System.Drawing.Size(29, 28);
+            this.tsbDeleteRule.Text = ""; // *** SỬA ***
+            this.tsbDeleteRule.ToolTipText = "Delete Selected Rule"; // *** SỬA ***
             this.tsbDeleteRule.Click += new System.EventHandler(this.tsbDeleteRule_Click);
             // 
             // toolStripSeparator1
             // 
             this.toolStripSeparator1.Name = "toolStripSeparator1";
-            this.toolStripSeparator1.Size = new System.Drawing.Size(6, 25);
+            this.toolStripSeparator1.Size = new System.Drawing.Size(6, 31);
             // 
             // tsbToggleService
             // 
-            this.tsbToggleService.CheckOnClick = true; // Quan trọng
-            this.tsbToggleService.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Text; // Hoặc ImageAndText
-            // this.tsbToggleService.Image = ((System.Drawing.Image)(resources.GetObject("tsbToggleService.Image")));
+            this.tsbToggleService.CheckOnClick = true;
+            this.tsbToggleService.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image; // *** SỬA ***
+            this.tsbToggleService.Image = global::QuickFnMapper.Properties.Resources.ServiceOnIcon; // Icon mặc định, sẽ đổi trong code
             this.tsbToggleService.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.tsbToggleService.Name = "tsbToggleService";
-            this.tsbToggleService.Size = new System.Drawing.Size(87, 22);
-            this.tsbToggleService.Text = "Enable Service"; // Sẽ được cập nhật
+            this.tsbToggleService.Size = new System.Drawing.Size(29, 28);
+            this.tsbToggleService.Text = ""; // *** SỬA ***
+            this.tsbToggleService.ToolTipText = "Enable Service"; // Sẽ được cập nhật trong code
             this.tsbToggleService.Click += new System.EventHandler(this.tsbToggleService_Click);
             // 
             // toolStripSeparator2
             // 
             this.toolStripSeparator2.Name = "toolStripSeparator2";
-            this.toolStripSeparator2.Size = new System.Drawing.Size(6, 25);
+            this.toolStripSeparator2.Size = new System.Drawing.Size(6, 31);
             // 
             // tsbSettings
             // 
-            this.tsbSettings.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image;
-            // this.tsbSettings.Image = ((System.Drawing.Image)(resources.GetObject("tsbSettings.Image")));
+            this.tsbSettings.DisplayStyle = System.Windows.Forms.ToolStripItemDisplayStyle.Image; // *** SỬA ***
+            this.tsbSettings.Image = global::QuickFnMapper.Properties.Resources.SettingsIcon; // *** SỬA ***
             this.tsbSettings.ImageTransparentColor = System.Drawing.Color.Magenta;
             this.tsbSettings.Name = "tsbSettings";
-            this.tsbSettings.Size = new System.Drawing.Size(23, 22);
-            this.tsbSettings.Text = "Application Settings";
+            this.tsbSettings.Size = new System.Drawing.Size(29, 28);
+            this.tsbSettings.Text = ""; // *** SỬA ***
+            this.tsbSettings.ToolTipText = "Application Settings"; // *** SỬA ***
             this.tsbSettings.Click += new System.EventHandler(this.tsbSettings_Click);
             // 
             // statusStripMain
             // 
+            this.statusStripMain.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.statusStripMain.ImageScalingSize = new System.Drawing.Size(20, 20);
             this.statusStripMain.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
-            this.lblStatusInfo,
-            this.lblStatusService});
-            this.statusStripMain.Location = new System.Drawing.Point(0, 539);
+    this.lblStatusInfo,
+    this.lblStatusService});
+            this.statusStripMain.Location = new System.Drawing.Point(0, 535); // ClientSize.Height - StatusStrip.Height
             this.statusStripMain.Name = "statusStripMain";
-            this.statusStripMain.Size = new System.Drawing.Size(784, 22);
-            this.statusStripMain.TabIndex = 2;
+            this.statusStripMain.Size = new System.Drawing.Size(884, 26);
+            this.statusStripMain.TabIndex = 3;
             this.statusStripMain.Text = "statusStrip1";
             // 
             // lblStatusInfo
             // 
             this.lblStatusInfo.Name = "lblStatusInfo";
-            this.lblStatusInfo.Size = new System.Drawing.Size(39, 17);
+            this.lblStatusInfo.Size = new System.Drawing.Size(50, 20);
             this.lblStatusInfo.Text = "Ready";
             // 
             // lblStatusService
             // 
             this.lblStatusService.Name = "lblStatusService";
-            this.lblStatusService.Size = new System.Drawing.Size(730, 17); // Spring = true sẽ làm nó co giãn
+            this.lblStatusService.Size = new System.Drawing.Size(819, 20);
             this.lblStatusService.Spring = true;
             this.lblStatusService.Text = "Service: Unknown";
             this.lblStatusService.TextAlign = System.Drawing.ContentAlignment.MiddleRight;
             // 
             // pnlMainContent
             // 
-            this.pnlMainContent.Controls.Add(this.listViewRules); // Ban đầu có thể chứa ListView
+            this.pnlMainContent.Controls.Add(this.listViewRules);
             this.pnlMainContent.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.pnlMainContent.Location = new System.Drawing.Point(0, 49); // Sau MenuStrip và ToolStrip
+            this.pnlMainContent.Location = new System.Drawing.Point(0, 59); // MenuStrip.Height (28) + ToolStrip.Height (31)
             this.pnlMainContent.Name = "pnlMainContent";
-            this.pnlMainContent.Size = new System.Drawing.Size(784, 490);
-            this.pnlMainContent.TabIndex = 3;
+            this.pnlMainContent.Padding = new System.Windows.Forms.Padding(5);
+            this.pnlMainContent.Size = new System.Drawing.Size(884, 476); // ClientSize.Height - Location.Y - StatusStrip.Height
+            this.pnlMainContent.TabIndex = 2;
             // 
             // listViewRules
             // 
-            this.listViewRules.CheckBoxes = true; // Nếu muốn bật/tắt rule từ ListView
+            this.listViewRules.CheckBoxes = true;
             this.listViewRules.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
-            this.colEnabled,
-            this.colRuleName,
-            this.colOriginalKey,
-            this.colTargetAction,
-            this.colOrder,
-            this.colLastModified});
-            this.listViewRules.Dock = System.Windows.Forms.DockStyle.Fill; // Để ListView chiếm hết pnlMainContent ban đầu
+    this.colEnabled,
+    this.colRuleName,
+    this.colOriginalKey,
+    this.colTargetAction,
+    this.colOrder,
+    this.colLastModified});
+            this.listViewRules.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.listViewRules.Font = new System.Drawing.Font("Segoe UI", 9F);
             this.listViewRules.FullRowSelect = true;
             this.listViewRules.GridLines = true;
             this.listViewRules.HideSelection = false;
             listViewItem1.StateImageIndex = 0;
             this.listViewRules.Items.AddRange(new System.Windows.Forms.ListViewItem[] {
-            listViewItem1}); // Ví dụ item, sẽ bị xóa bởi DisplayRules
-            this.listViewRules.Location = new System.Drawing.Point(0, 0); // Nằm trong pnlMainContent
+    listViewItem1});
+            this.listViewRules.Location = new System.Drawing.Point(5, 5);
             this.listViewRules.MultiSelect = false;
             this.listViewRules.Name = "listViewRules";
-            this.listViewRules.Size = new System.Drawing.Size(784, 490);
+            this.listViewRules.Size = new System.Drawing.Size(874, 466); // pnlMainContent.ClientHeight - Padding*2
             this.listViewRules.TabIndex = 0;
             this.listViewRules.UseCompatibleStateImageBehavior = false;
             this.listViewRules.View = System.Windows.Forms.View.Details;
@@ -351,28 +369,29 @@
             // 
             // colEnabled
             // 
-            this.colEnabled.Text = "Enabled";
-            this.colEnabled.Width = 70;
+            this.colEnabled.Text = "Active";
+            this.colEnabled.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
+            this.colEnabled.Width = 50;
             // 
             // colRuleName
             // 
             this.colRuleName.Text = "Rule Name";
-            this.colRuleName.Width = 200;
+            this.colRuleName.Width = 220;
             // 
             // colOriginalKey
             // 
             this.colOriginalKey.Text = "Original Key";
-            this.colOriginalKey.Width = 150;
+            this.colOriginalKey.Width = 180;
             // 
             // colTargetAction
             // 
             this.colTargetAction.Text = "Target Action";
-            this.colTargetAction.Width = 200;
+            this.colTargetAction.Width = 250;
             // 
             // colOrder
             // 
             this.colOrder.Text = "Order";
-            this.colOrder.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
+            this.colOrder.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
             this.colOrder.Width = 50;
             // 
             // colLastModified
@@ -380,29 +399,74 @@
             this.colLastModified.Text = "Last Modified";
             this.colLastModified.Width = 120;
             // 
+            // trayNotifyIcon
+            // 
+            this.trayNotifyIcon.ContextMenuStrip = this.trayContextMenuStrip;
+            // Icon sẽ được gán trong MainForm.cs, ví dụ:
+            // this.trayNotifyIcon.Icon = global::QuickFnMapper.WinForms.Properties.Resources.AppTrayDisabledIcon; 
+            this.trayNotifyIcon.Text = "QuickFn Mapper";
+            // 
+            // trayContextMenuStrip
+            // 
+            this.trayContextMenuStrip.ImageScalingSize = new System.Drawing.Size(20, 20);
+            this.trayContextMenuStrip.Items.AddRange(new System.Windows.Forms.ToolStripItem[] {
+    this.showToolStripMenuItemTray,
+    this.traySeparator1,
+    this.toggleServiceTrayMenuItem,
+    this.exitToolStripMenuItemTray});
+            this.trayContextMenuStrip.Name = "trayContextMenuStrip";
+            this.trayContextMenuStrip.Size = new System.Drawing.Size(235, 88); // Cập nhật Size để chứa item mới (VS tự tính)
+                                                                               // 
+                                                                               // showToolStripMenuItemTray
+                                                                               // 
+            this.showToolStripMenuItemTray.Name = "showToolStripMenuItemTray";
+            this.showToolStripMenuItemTray.Size = new System.Drawing.Size(234, 26);
+            this.showToolStripMenuItemTray.Text = "Hiển thị QuickFn Mapper";
+            // 
+            // traySeparator1
+            // 
+            this.traySeparator1.Name = "traySeparator1";
+            this.traySeparator1.Size = new System.Drawing.Size(231, 6);
+            // 
+            // toggleServiceTrayMenuItem
+            // 
+            this.toggleServiceTrayMenuItem.CheckOnClick = true;
+            this.toggleServiceTrayMenuItem.Name = "toggleServiceTrayMenuItem";
+            this.toggleServiceTrayMenuItem.Size = new System.Drawing.Size(234, 26);
+            this.toggleServiceTrayMenuItem.Text = "&Enable Service";
+            // 
+            // exitToolStripMenuItemTray
+            // 
+            this.exitToolStripMenuItemTray.Name = "exitToolStripMenuItemTray";
+            this.exitToolStripMenuItemTray.Size = new System.Drawing.Size(234, 26);
+            this.exitToolStripMenuItemTray.Text = "Thoát";
+            // 
             // MainForm
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(8F, 20F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(784, 561); // Kích thước ví dụ
+            this.ClientSize = new System.Drawing.Size(884, 561);
             this.Controls.Add(this.pnlMainContent);
             this.Controls.Add(this.statusStripMain);
             this.Controls.Add(this.toolStripMain);
-            this.Controls.Add(this.menuStripMain);
-            this.MainMenuStrip = this.menuStripMain;
+            this.Controls.Add(this.mainMenuStrip);
+            this.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.MainMenuStrip = this.mainMenuStrip;
+            this.MinimumSize = new System.Drawing.Size(700, 450);
             this.Name = "MainForm";
-            this.Text = "QuickFn Mapper";
-            // Sự kiện Load và FormClosing sẽ được đăng ký trong MainForm.cs constructor
-            // hoặc Designer cũng có thể tự tạo nếu Đại ca double click vào Form trong trình thiết kế.
-            // this.Load += new System.EventHandler(this.MainForm_Load);
-            // this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.MainForm_FormClosing);
-            this.menuStripMain.ResumeLayout(false);
-            this.menuStripMain.PerformLayout();
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+            this.Text = "QuickFn Mapper - Advanced Key Remapping";
+            // this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon"))); 
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.MainForm_FormClosing);
+            this.Load += new System.EventHandler(this.MainForm_Load);
+            this.mainMenuStrip.ResumeLayout(false);
+            this.mainMenuStrip.PerformLayout();
             this.toolStripMain.ResumeLayout(false);
             this.toolStripMain.PerformLayout();
             this.statusStripMain.ResumeLayout(false);
             this.statusStripMain.PerformLayout();
-            this.pnlMainContent.ResumeLayout(false); // Panel chứa ListView
+            this.pnlMainContent.ResumeLayout(false);
+            this.trayContextMenuStrip.ResumeLayout(false);
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -410,10 +474,22 @@
 
         #endregion
 
-        private System.Windows.Forms.MenuStrip menuStripMain;
+        private System.Windows.Forms.MenuStrip mainMenuStrip;
         private System.Windows.Forms.ToolStripMenuItem fileToolStripMenuItem;
         private System.Windows.Forms.ToolStripMenuItem exitToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem rulesToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem addRuleToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem editRuleToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem deleteRuleToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem serviceToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem toggleServiceToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem toolsToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem settingsToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem helpToolStripMenuItem;
+        private System.Windows.Forms.ToolStripMenuItem aboutToolStripMenuItem;
         private System.Windows.Forms.ToolStrip toolStripMain;
+        private System.Windows.Forms.ToolStripButton tsbShowHome;
+        private System.Windows.Forms.ToolStripSeparator toolStripSeparator3;
         private System.Windows.Forms.ToolStripButton tsbAddRule;
         private System.Windows.Forms.ToolStripButton tsbEditRule;
         private System.Windows.Forms.ToolStripButton tsbDeleteRule;
@@ -432,17 +508,11 @@
         private System.Windows.Forms.ColumnHeader colTargetAction;
         private System.Windows.Forms.ColumnHeader colOrder;
         private System.Windows.Forms.ColumnHeader colLastModified;
-        private System.Windows.Forms.ToolStripMenuItem toolsToolStripMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem settingsToolStripMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem serviceToolStripMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem toggleServiceToolStripMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem rulesToolStripMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem addRuleToolStripMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem editRuleToolStripMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem deleteRuleToolStripMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem helpToolStripMenuItem;
-        private System.Windows.Forms.ToolStripMenuItem aboutToolStripMenuItem;
-        private System.Windows.Forms.ToolStripButton tsbShowHome;
-        private System.Windows.Forms.ToolStripSeparator toolStripSeparator3;
+        private System.Windows.Forms.NotifyIcon trayNotifyIcon;
+        private System.Windows.Forms.ContextMenuStrip trayContextMenuStrip;
+        private System.Windows.Forms.ToolStripMenuItem showToolStripMenuItemTray;
+        private System.Windows.Forms.ToolStripMenuItem exitToolStripMenuItemTray;
+        private System.Windows.Forms.ToolStripSeparator traySeparator1;
+        private System.Windows.Forms.ToolStripMenuItem toggleServiceTrayMenuItem;
     }
 }

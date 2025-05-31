@@ -1,103 +1,52 @@
 ﻿#region Using Directives
+using System.Management;
 using QuickFnMapper.Core.Models;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics; // For Debug.WriteLine
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
-using System.Text.Json;
-using System.Windows.Forms; // For Keys enum and SendInput related constants
+using System.Text.Json; // Đảm bảo using này có
+using System.Windows.Forms; // For Keys enum
+using WindowsInput;
+using WindowsInput.Native;
+// using QuickFnMapper.Core.Services; // Không cần nếu NotificationEventArgs cùng namespace
 #endregion
 
 namespace QuickFnMapper.Core.Services
 {
-    /// <summary>
-    /// <para>Manages key mapping rules, including loading, saving, and processing them in conjunction with the global keyboard hook.</para>
-    /// <para>Quản lý các quy tắc ánh xạ phím, bao gồm việc tải, lưu và xử lý chúng kết hợp với hook bàn phím toàn cục.</para>
-    /// </summary>
     public class KeyMappingService : IKeyMappingService
     {
-        #region P/Invoke for SendInput (Action Execution)
-
+        #region P/Invoke for SendInput (Dùng cho SendMediaKeyAction)
         [StructLayout(LayoutKind.Sequential)]
-        private struct INPUT
-        {
-            public uint type;
-            public InputUnion U;
-            public static int Size => Marshal.SizeOf(typeof(INPUT));
-        }
-
+        private struct INPUT { public uint type; public InputUnion U; public static int Size => Marshal.SizeOf(typeof(INPUT)); }
         [StructLayout(LayoutKind.Explicit)]
-        private struct InputUnion
-        {
-            [FieldOffset(0)]
-            public MOUSEINPUT mi;
-            [FieldOffset(0)]
-            public KEYBDINPUT ki;
-            [FieldOffset(0)]
-            public HARDWAREINPUT hi;
-        }
-
+        private struct InputUnion { [FieldOffset(0)] public MOUSEINPUT mi; [FieldOffset(0)] public KEYBDINPUT ki; [FieldOffset(0)] public HARDWAREINPUT hi; }
         [StructLayout(LayoutKind.Sequential)]
-        private struct KEYBDINPUT
-        {
-            public ushort wVk;
-            public ushort wScan;
-            public uint dwFlags;
-            public uint time;
-            public IntPtr dwExtraInfo;
-        }
-
+        private struct KEYBDINPUT { public ushort wVk; public ushort wScan; public uint dwFlags; public uint time; public IntPtr dwExtraInfo; }
         [StructLayout(LayoutKind.Sequential)]
-        private struct MOUSEINPUT
-        {
-            public int dx;
-            public int dy;
-            public uint mouseData;
-            public uint dwFlags;
-            public uint time;
-            public IntPtr dwExtraInfo;
-        }
-
+        private struct MOUSEINPUT { public int dx; public int dy; public uint mouseData; public uint dwFlags; public uint time; public IntPtr dwExtraInfo; }
         [StructLayout(LayoutKind.Sequential)]
-        private struct HARDWAREINPUT
-        {
-            public uint uMsg;
-            public ushort wParamL;
-            public ushort wParamH;
-        }
-
+        private struct HARDWAREINPUT { public uint uMsg; public ushort wParamL; public ushort wParamH; }
         private const uint INPUT_KEYBOARD = 1;
-        private const uint KEYEVENTF_EXTENDEDKEY = 0x0001;
         private const uint KEYEVENTF_KEYUP = 0x0002;
-        // private const uint KEYEVENTF_UNICODE = 0x0004; 
-        // private const uint KEYEVENTF_SCANCODE = 0x0008; 
-
-        // Virtual Key Codes for Media Keys (subset)
-        private const ushort VK_VOLUME_MUTE = 0xAD;
-        private const ushort VK_VOLUME_DOWN = 0xAE;
-        private const ushort VK_VOLUME_UP = 0xAF;
-        private const ushort VK_MEDIA_NEXT_TRACK = 0xB0;
-        private const ushort VK_MEDIA_PREV_TRACK = 0xB1;
-        private const ushort VK_MEDIA_STOP = 0xB2;
-        private const ushort VK_MEDIA_PLAY_PAUSE = 0xB3;
-
+        private const ushort VK_VOLUME_MUTE = 0xAD; private const ushort VK_VOLUME_DOWN = 0xAE; private const ushort VK_VOLUME_UP = 0xAF; private const ushort VK_MEDIA_NEXT_TRACK = 0xB0; private const ushort VK_MEDIA_PREV_TRACK = 0xB1; private const ushort VK_MEDIA_STOP = 0xB2; private const ushort VK_MEDIA_PLAY_PAUSE = 0xB3;
         [DllImport("user32.dll", SetLastError = true)]
         private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
-
         [DllImport("user32.dll")]
         private static extern IntPtr GetMessageExtraInfo();
-
         #endregion
 
         #region Fields
         private readonly IGlobalHookService _globalHookService;
         private readonly IAppSettingsService _appSettingsService;
-        private List<KeyMappingRule> _rules; // Sẽ được khởi tạo trong constructor hoặc LoadRules
+        private List<KeyMappingRule> _rules;
         private bool _isServiceCurrentlyEnabled;
-        private readonly string _rulesFilePath; // Đảm bảo non-null sau constructor
+        private readonly string _rulesFilePath;
+        private readonly IInputSimulator _inputSimulator;
 
+        // ĐẢM BẢO FIELD NÀY CÓ VÀ ĐÚNG
         private static readonly JsonSerializerOptions _jsonSerializerOptions = new JsonSerializerOptions
         {
             WriteIndented = true,
@@ -106,220 +55,69 @@ namespace QuickFnMapper.Core.Services
         };
         #endregion
 
-        #region Properties
-        /// <inheritdoc cref="IKeyMappingService.IsServiceEnabled"/>
-        public bool IsServiceEnabled => _isServiceCurrentlyEnabled;
+        #region Events
+        // Event để thông báo ra ngoài khi cần hiển thị notification
+        public event EventHandler<NotificationEventArgs>? NotificationRequested;
         #endregion
 
-        #region Constructors
-        /// <summary>
-        /// <para>Initializes a new instance of the <see cref="KeyMappingService"/> class.</para>
-        /// <para>Khởi tạo một đối tượng mới của lớp <see cref="KeyMappingService"/>.</para>
-        /// </summary>
-        /// <param name="globalHookService">
-        /// <para>The global hook service to subscribe to key events. Must not be null.</para>
-        /// <para>Dịch vụ hook toàn cục để đăng ký sự kiện phím. Không được null.</para>
-        /// </param>
-        /// <param name="appSettingsService">
-        /// <para>The application settings service to get configuration like rules file path. Must not be null.</para>
-        /// <para>Dịch vụ cài đặt ứng dụng để lấy cấu hình như đường dẫn tệp quy tắc. Không được null.</para>
-        /// </param>
         public KeyMappingService(IGlobalHookService globalHookService, IAppSettingsService appSettingsService)
         {
             _globalHookService = globalHookService ?? throw new ArgumentNullException(nameof(globalHookService));
             _appSettingsService = appSettingsService ?? throw new ArgumentNullException(nameof(appSettingsService));
+            _inputSimulator = new InputSimulator();
 
-            // Lấy đường dẫn file rules ngay khi khởi tạo và đảm bảo nó non-null
-            AppSettings settings = _appSettingsService.LoadSettings(); // LoadSettings() đảm bảo trả về non-null
-            _rulesFilePath = settings.RulesFilePath; // RulesFilePath trong AppSettings cũng đảm bảo non-null
-            if (string.IsNullOrWhiteSpace(_rulesFilePath)) // Kiểm tra dự phòng (mặc dù AppSettings nên đảm bảo)
+            AppSettings settings = _appSettingsService.LoadSettings();
+            _rulesFilePath = settings.RulesFilePath;
+            if (string.IsNullOrWhiteSpace(_rulesFilePath))
             {
-                // Gán một đường dẫn mặc định an toàn nếu RulesFilePath từ AppSettings vẫn rỗng
                 string appDataFolder = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
                 _rulesFilePath = Path.Combine(appDataFolder, "QuickFnMapper", "DefaultKeyMappings.json");
                 Debug.WriteLine($"[WARN] KeyMappingService: RulesFilePath from AppSettings was empty. Using default: {_rulesFilePath}");
             }
 
-            _rules = new List<KeyMappingRule>(); // Khởi tạo list rỗng trước
+            _rules = new List<KeyMappingRule>();
             _isServiceCurrentlyEnabled = false;
-
-            LoadRules(); // Tải quy tắc khi khởi tạo. LoadRules sẽ sử dụng _rulesFilePath đã được gán.
+            LoadRules();
         }
+
+        #region Properties
+        public bool IsServiceEnabled => _isServiceCurrentlyEnabled;
         #endregion
 
         #region IKeyMappingService Implementation
-
-        /// <inheritdoc cref="IKeyMappingService.EnableService"/>
-        public void EnableService()
-        {
-            if (_isServiceCurrentlyEnabled) return;
-
-            try
-            {
-                _globalHookService.KeyDownEvent += OnGlobalKeyDown;
-                _globalHookService.StartHook();
-                _isServiceCurrentlyEnabled = true;
-                Debug.WriteLineIf(_isServiceCurrentlyEnabled, "[INFO] KeyMappingService: Enabled and hook started.");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ERROR] KeyMappingService: Failed to enable service. {ex.Message}");
-                DisableService(); // Cố gắng dọn dẹp
-                // Cân nhắc ném lại exception hoặc một custom exception
-                // throw new InvalidOperationException("Failed to enable KeyMappingService.", ex);
-            }
-        }
-
-        /// <inheritdoc cref="IKeyMappingService.DisableService"/>
-        public void DisableService()
-        {
-            // Chỉ thực hiện nếu service đang chạy hoặc hook đang chạy (để đảm bảo an toàn)
-            if (!_isServiceCurrentlyEnabled && !_globalHookService.IsHookRunning) return;
-
-            try
-            {
-                _globalHookService.StopHook(); // Luôn cố gắng stop hook
-                _globalHookService.KeyDownEvent -= OnGlobalKeyDown;
-                _isServiceCurrentlyEnabled = false;
-                Debug.WriteLineIf(!_isServiceCurrentlyEnabled, "[INFO] KeyMappingService: Disabled and hook stopped.");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ERROR] KeyMappingService: Failed to disable service properly. {ex.Message}");
-                // Trong trường hợp này, trạng thái có thể không nhất quán, cần log cẩn thận.
-            }
-        }
-
-        /// <inheritdoc cref="IKeyMappingService.LoadRules"/>
-        public void LoadRules()
-        {
-            // _rulesFilePath đã được gán trong constructor và đảm bảo non-null/non-whitespace
-            try
-            {
-                if (File.Exists(_rulesFilePath))
-                {
-                    string jsonString = File.ReadAllText(_rulesFilePath);
-                    if (!string.IsNullOrWhiteSpace(jsonString))
-                    {
-                        List<KeyMappingRule>? loadedRules = JsonSerializer.Deserialize<List<KeyMappingRule>>(jsonString, _jsonSerializerOptions);
-                        _rules = loadedRules ?? new List<KeyMappingRule>();
-                        Debug.WriteLine($"[INFO] KeyMappingService: Loaded {_rules.Count} rules from '{_rulesFilePath}'.");
-                        return;
-                    }
-                    else
-                    {
-                        Debug.WriteLine($"[INFO] KeyMappingService: Rules file '{_rulesFilePath}' is empty. Initializing with empty list.");
-                    }
-                }
-                else
-                {
-                    Debug.WriteLine($"[INFO] KeyMappingService: Rules file '{_rulesFilePath}' not found. Initializing with empty list.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ERROR] KeyMappingService: Error loading rules from '{_rulesFilePath}'. {ex.Message}. Initializing with empty list.");
-            }
-            _rules = new List<KeyMappingRule>();
-        }
-
-        /// <inheritdoc cref="IKeyMappingService.SaveRules"/>
-        public void SaveRules()
-        {
-            // _rulesFilePath đã được gán trong constructor và đảm bảo non-null/non-whitespace
-            try
-            {
-                string? directory = Path.GetDirectoryName(_rulesFilePath); // GetDirectoryName có thể trả về null nếu path là root
-                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-
-                string jsonString = JsonSerializer.Serialize(_rules, _jsonSerializerOptions);
-                File.WriteAllText(_rulesFilePath, jsonString);
-                Debug.WriteLine($"[INFO] KeyMappingService: Saved {_rules.Count} rules to '{_rulesFilePath}'.");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ERROR] KeyMappingService: Error saving rules to '{_rulesFilePath}'. {ex.Message}");
-            }
-        }
-
-        /// <inheritdoc cref="IKeyMappingService.GetAllRules"/>
-        public IEnumerable<KeyMappingRule> GetAllRules()
-        {
-            return _rules.ToList(); // Trả về bản sao để bảo vệ list gốc
-        }
-
-        /// <inheritdoc cref="IKeyMappingService.GetRuleById"/>
-        public KeyMappingRule? GetRuleById(Guid id) // Kiểu trả về là nullable
-        {
-            return _rules.FirstOrDefault(r => r.Id == id);
-        }
-
-        /// <inheritdoc cref="IKeyMappingService.AddRule"/>
-        public void AddRule(KeyMappingRule rule)
-        {
-            if (rule == null) throw new ArgumentNullException(nameof(rule));
-            if (_rules.Any(r => r.Id == rule.Id))
-            {
-                throw new InvalidOperationException($"Rule with ID {rule.Id} already exists.");
-            }
-            _rules.Add(rule);
-            SaveRules();
-        }
-
-        /// <inheritdoc cref="IKeyMappingService.UpdateRule"/>
-        public void UpdateRule(KeyMappingRule rule)
-        {
-            if (rule == null) throw new ArgumentNullException(nameof(rule));
-            int index = _rules.FindIndex(r => r.Id == rule.Id);
-            if (index == -1)
-            {
-                throw new InvalidOperationException($"Rule with ID {rule.Id} not found for update.");
-            }
-            // Đảm bảo OriginalKey và TargetActionDetails không bị null nếu rule đầu vào có thể bị thiếu
-            rule.OriginalKey ??= new OriginalKeyData(Keys.None);
-            rule.TargetActionDetails ??= new TargetAction();
-
-            _rules[index] = rule;
-            rule.LastModifiedDate = DateTime.UtcNow;
-            SaveRules();
-        }
-
-        /// <inheritdoc cref="IKeyMappingService.DeleteRule"/>
-        public void DeleteRule(Guid id)
-        {
-            int removedCount = _rules.RemoveAll(r => r.Id == id);
-            if (removedCount == 0)
-            {
-                // Không ném lỗi nếu không tìm thấy có thể thân thiện hơn, tùy yêu cầu
-                // throw new InvalidOperationException($"Rule with ID {id} not found for deletion.");
-                Debug.WriteLine($"[WARN] KeyMappingService: Rule with ID {id} not found for deletion.");
-                return;
-            }
-            SaveRules();
-        }
+        // ... (EnableService, DisableService, LoadRules, SaveRules, GetAllRules, GetRuleById, AddRule, UpdateRule, DeleteRule giữ nguyên như lần trước)
+        public void EnableService() { if (_isServiceCurrentlyEnabled) return; try { _globalHookService.KeyDownEvent += OnGlobalKeyDown; _globalHookService.StartHook(); _isServiceCurrentlyEnabled = true; Debug.WriteLineIf(_isServiceCurrentlyEnabled, "[INFO] KeyMappingService: Enabled."); } catch (Exception ex) { Debug.WriteLine($"[ERROR] KS: Enable failed. {ex.Message}"); DisableService(); } }
+        public void DisableService() { if (!_isServiceCurrentlyEnabled && !_globalHookService.IsHookRunning) return; try { _globalHookService.StopHook(); _globalHookService.KeyDownEvent -= OnGlobalKeyDown; _isServiceCurrentlyEnabled = false; Debug.WriteLineIf(!_isServiceCurrentlyEnabled, "[INFO] KeyMappingService: Disabled."); } catch (Exception ex) { Debug.WriteLine($"[ERROR] KS: Disable failed. {ex.Message}"); } }
+        public void LoadRules() { try { if (File.Exists(_rulesFilePath)) { string json = File.ReadAllText(_rulesFilePath); if (!string.IsNullOrWhiteSpace(json)) { _rules = JsonSerializer.Deserialize<List<KeyMappingRule>>(json, _jsonSerializerOptions) ?? new List<KeyMappingRule>(); Debug.WriteLine($"[INFO] KS: Loaded {_rules.Count} rules from '{_rulesFilePath}'."); return; } else Debug.WriteLine($"[INFO] KS: Rules file '{_rulesFilePath}' empty."); } else Debug.WriteLine($"[INFO] KS: Rules file '{_rulesFilePath}' not found."); } catch (Exception ex) { Debug.WriteLine($"[ERROR] KS: Load rules error. {ex.Message}."); } _rules = new List<KeyMappingRule>(); }
+        public void SaveRules() { try { string? dir = Path.GetDirectoryName(_rulesFilePath); if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir); string json = JsonSerializer.Serialize(_rules, _jsonSerializerOptions); File.WriteAllText(_rulesFilePath, json); Debug.WriteLine($"[INFO] KS: Saved {_rules.Count} rules to '{_rulesFilePath}'."); } catch (Exception ex) { Debug.WriteLine($"[ERROR] KS: Save rules error. {ex.Message}"); } }
+        public IEnumerable<KeyMappingRule> GetAllRules() => _rules.ToList();
+        public KeyMappingRule? GetRuleById(Guid id) => _rules.FirstOrDefault(r => r.Id == id);
+        public void AddRule(KeyMappingRule rule) { if (rule == null) throw new ArgumentNullException(nameof(rule)); if (_rules.Any(r => r.Id == rule.Id)) throw new InvalidOperationException($"Rule ID {rule.Id} exists."); _rules.Add(rule); SaveRules(); }
+        public void UpdateRule(KeyMappingRule rule) { if (rule == null) throw new ArgumentNullException(nameof(rule)); int i = _rules.FindIndex(r => r.Id == rule.Id); if (i == -1) throw new InvalidOperationException($"Rule ID {rule.Id} not found."); rule.OriginalKey ??= new OriginalKeyData(Keys.None); rule.TargetActionDetails ??= new TargetAction(); _rules[i] = rule; rule.LastModifiedDate = DateTime.UtcNow; SaveRules(); }
+        public void DeleteRule(Guid id) { if (_rules.RemoveAll(r => r.Id == id) == 0) Debug.WriteLine($"[WARN] KS: Rule ID {id} not found for deletion."); else SaveRules(); }
 
         #endregion
 
         #region Private Helper Methods
-
-        private void OnGlobalKeyDown(object? sender, KeyEventArgsProcessed e) // Sửa: object? sender
+        private void OnGlobalKeyDown(object? sender, KeyEventArgsProcessed e)
         {
-            if (!_isServiceCurrentlyEnabled || e == null) return; // e.KeyData đã được kiểm tra non-null trong constructor của KeyEventArgsProcessed
+            if (!_isServiceCurrentlyEnabled || e == null || e.KeyData == null) return;
 
-            var activeRules = _rules.Where(r => r.IsEnabled)
+            var activeRules = _rules.Where(r => r.IsEnabled && r.OriginalKey != null) // Đảm bảo OriginalKey không null
                                     .OrderBy(r => r.Order)
                                     .ThenByDescending(r => r.LastModifiedDate);
 
-            foreach (var rule in activeRules) // rule ở đây là KeyMappingRule (non-null)
+            foreach (var rule in activeRules)
             {
-                // OriginalKey và TargetActionDetails trong rule được đảm bảo non-null bởi constructor của KeyMappingRule
-                if (DoesKeyMatchRule(e.KeyData, rule.OriginalKey!)) // Thêm '!' nếu chắc chắn OriginalKey không null sau khi khởi tạo
-                {                                                    // Hoặc kiểm tra rule.OriginalKey != null trước
-                    Debug.WriteLine($"[INFO] KeyMappingService: Matched rule '{rule.Name}' for key {e.KeyData.Key}");
-                    ExecuteAction(rule.TargetActionDetails!); // Tương tự cho TargetActionDetails
+                // OriginalKey đã được kiểm tra không null ở trên
+                if (DoesKeyMatchRule(e.KeyData, rule.OriginalKey!))
+                {
+                    string ruleNameForNotification = rule.Name ?? "Unnamed Rule";
+                    Debug.WriteLine($"[INFO] KeyMappingService: Matched rule '{ruleNameForNotification}' for key {e.KeyData.Key}");
+                    if (rule.TargetActionDetails != null)
+                    {
+                        ExecuteAction(rule.TargetActionDetails, ruleNameForNotification);
+                    }
                     e.Handled = true;
                     break;
                 }
@@ -328,307 +126,267 @@ namespace QuickFnMapper.Core.Services
 
         private bool DoesKeyMatchRule(OriginalKeyData pressedKey, OriginalKeyData ruleKey)
         {
-            // pressedKey và ruleKey được mong đợi là non-null ở đây
-            // Constructor của OriginalKeyData đảm bảo Key không phải là null (là Keys.None)
-            bool keyMatch = pressedKey.Key == ruleKey.Key;
-            bool ctrlMatch = pressedKey.Ctrl == ruleKey.Ctrl;
-            bool shiftMatch = pressedKey.Shift == ruleKey.Shift;
-            bool altMatch = pressedKey.Alt == ruleKey.Alt;
-            bool winMatch = pressedKey.Win == ruleKey.Win;
-
-            return keyMatch && ctrlMatch && shiftMatch && altMatch && winMatch;
+            return pressedKey.Key == ruleKey.Key &&
+                   pressedKey.Ctrl == ruleKey.Ctrl &&
+                   pressedKey.Shift == ruleKey.Shift &&
+                   pressedKey.Alt == ruleKey.Alt &&
+                   pressedKey.Win == ruleKey.Win;
         }
 
-        /// <summary>
-        /// <para>Executes the target action defined in a key mapping rule.</para>
-        /// <para>Thực thi hành động đích được định nghĩa trong một quy tắc ánh xạ phím.</para>
-        /// </summary>
-        private void ExecuteAction(TargetAction actionDetails) // actionDetails được đảm bảo non-null từ OnGlobalKeyDown
+        // ExecuteAction nhận thêm ruleName để dùng trong notification
+        private void ExecuteAction(TargetAction actionDetails, string ruleName)
         {
+            AppSettings settings = _appSettingsService.LoadSettings();
+            bool ruleExecutedSuccessfully = false;
+            string? errorMessage = null;
+            string actionTypeString = actionDetails.Type.ToString();
+            string actionParamString = actionDetails.ActionParameter ?? string.Empty;
+
             try
             {
-                Debug.WriteLine($"[INFO] Executing action: {actionDetails.Type}, Param: '{actionDetails.ActionParameter}'");
+                Debug.WriteLine($"[INFO] Executing action: {actionTypeString}, Param: '{actionParamString}' for rule '{ruleName}'");
                 switch (actionDetails.Type)
                 {
-                    case ActionType.SendMediaKey:
-                        SendMediaKeyAction(actionDetails.ActionParameter);
+                    case ActionType.SendMediaKey: SendMediaKeyAction(actionParamString); ruleExecutedSuccessfully = true; break;
+                    case ActionType.RunApplication: RunApplicationAction(actionParamString); ruleExecutedSuccessfully = true; break;
+                    case ActionType.OpenUrl: OpenUrlAction(actionParamString); ruleExecutedSuccessfully = true; break;
+                    case ActionType.SendText: SendTextAction(actionParamString); ruleExecutedSuccessfully = true; break;
+                    case ActionType.TriggerHotkeyOrCommand: TriggerHotkeyOrCommandAction(actionParamString, actionDetails.ActionParameterSecondary); ruleExecutedSuccessfully = true; break;
+                    case ActionType.SetScreenBrightness:
+                        AdjustScreenBrightness(actionParamString);
+                        // Giả sử AdjustScreenBrightness sẽ tự xử lý thông báo lỗi nếu cần
+                        // Hoặc bạn có thể kiểm tra kết quả trả về từ AdjustScreenBrightness nếu có
+                        ruleExecutedSuccessfully = true; // Giả định thành công nếu không có exception
                         break;
-                    case ActionType.RunApplication:
-                        RunApplicationAction(actionDetails.ActionParameter);
-                        break;
-                    case ActionType.OpenUrl:
-                        OpenUrlAction(actionDetails.ActionParameter);
-                        break;
-                    case ActionType.SendText:
-                        SendTextAction(actionDetails.ActionParameter ?? string.Empty);
-                        break;
-                    case ActionType.TriggerHotkeyOrCommand:
-                        TriggerHotkeyOrCommandAction(actionDetails.ActionParameter, actionDetails.ActionParameterSecondary);
-                        break;
-                    case ActionType.None:
-                    default:
-                        Debug.WriteLine($"[INFO] ActionType is None or unhandled: {actionDetails.Type}");
-                        break;
+                    case ActionType.None: Debug.WriteLine($"[INFO] ActionType is None for rule '{ruleName}'."); break; // Không thông báo thành công cho None
+                    default: Debug.WriteLine($"[WARN] Unhandled ActionType: {actionDetails.Type} for rule '{ruleName}'."); break;
                 }
             }
             catch (Exception ex)
             {
-                // Nên có cơ chế thông báo lỗi cho người dùng nếu AppSettings.ShowNotifications = true
-                Debug.WriteLine($"[ERROR] KeyMappingService: Error executing action '{actionDetails.Type}' with param '{actionDetails.ActionParameter}'. {ex.Message}");
-                // Ví dụ: _notificationService.ShowError($"Failed to execute action: {actionDetails.Name}", ex.Message);
+                errorMessage = ex.Message;
+                Debug.WriteLine($"[ERROR] KeyMappingService: Error executing action '{actionTypeString}' for rule '{ruleName}'. {errorMessage}");
+            }
+
+            // Raise event nếu setting ShowNotifications được bật
+            if (settings.ShowNotifications)
+            {
+                NotificationEventArgs.NotificationInfo? notificationInfo = null;
+                if (ruleExecutedSuccessfully && actionDetails.Type != ActionType.None) // Chỉ thông báo thành công nếu không phải ActionType.None
+                {
+                    notificationInfo = new NotificationEventArgs.NotificationInfo(
+                        $"Rule '{Truncate(ruleName, 30)}' Triggered",
+                        $"Action '{actionTypeString}' executed." +
+                        (!string.IsNullOrEmpty(actionParamString) ? $" Param: '{Truncate(actionParamString, 50)}'" : ""),
+                        NotificationType.Info // Enum từ NotificationEventArgs.cs
+                    );
+                }
+                else if (!string.IsNullOrEmpty(errorMessage))
+                {
+                    notificationInfo = new NotificationEventArgs.NotificationInfo(
+                        $"Error in Rule '{Truncate(ruleName, 30)}'",
+                        $"Failed to execute '{actionTypeString}'. Error: {Truncate(errorMessage, 100)}",
+                        NotificationType.Error // Enum từ NotificationEventArgs.cs
+                    );
+                }
+
+                if (notificationInfo != null)
+                {
+                    OnNotificationRequested(notificationInfo);
+                }
             }
         }
 
-        /// <summary>
-        /// <para>Sends a media key press and release using SendInput.</para>
-        /// <para>Gửi một lệnh nhấn và thả phím media sử dụng SendInput.</para>
-        /// </summary>
-        private void SendMediaKeyAction(string? mediaKeyName)
+        // Phương thức để raise event
+        protected virtual void OnNotificationRequested(NotificationEventArgs.NotificationInfo info)
         {
-            if (string.IsNullOrWhiteSpace(mediaKeyName))
-            {
-                Debug.WriteLine("[WARN] SendMediaKeyAction: Media key name is null or empty.");
-                return;
-            }
+            NotificationRequested?.Invoke(this, new NotificationEventArgs(info));
+        }
 
-            ushort vkCode = 0;
-            // Chuẩn hóa tên key để so sánh không phân biệt chữ hoa/thường và bỏ dấu cách nếu có
-            string normalizedKeyName = mediaKeyName.Replace(" ", "").ToUpperInvariant();
+        private string Truncate(string? value, int maxLength)
+        {
+            if (string.IsNullOrEmpty(value)) return string.Empty;
+            return value.Length <= maxLength ? value : value.Substring(0, maxLength) + "...";
+        }
 
-            switch (normalizedKeyName)
+        // ... (Các phương thức SendMediaKeyAction, SendTextAction, RunApplicationAction, OpenUrlAction, TriggerHotkeyOrCommandAction giữ nguyên như lần cập nhật trước)
+        private void SendMediaKeyAction(string? mediaKeyName) { if (string.IsNullOrWhiteSpace(mediaKeyName)) { Debug.WriteLine("[WARN] SendMediaKeyAction: null/empty."); return; } ushort vk = 0; string norm = mediaKeyName.Replace(" ", "").ToUpperInvariant(); switch (norm) { case "VOLUMEMUTE": case "MUTE": vk = VK_VOLUME_MUTE; break; case "VOLUMEDOWN": vk = VK_VOLUME_DOWN; break; case "VOLUMEUP": vk = VK_VOLUME_UP; break; case "MEDIANEXTTRACK": case "NEXT": vk = VK_MEDIA_NEXT_TRACK; break; case "MEDIAPREVIOUSTRACK": case "PREVIOUS": case "PREV": vk = VK_MEDIA_PREV_TRACK; break; case "MEDIASTOP": case "STOP": vk = VK_MEDIA_STOP; break; case "MEDIAPLAYPAUSE": case "PLAYPAUSE": case "PLAY": case "PAUSE": vk = VK_MEDIA_PLAY_PAUSE; break; default: if (!ushort.TryParse(mediaKeyName, out vk)) { Debug.WriteLine($"[WARN] SendMediaKey: Unknown '{mediaKeyName}'"); return; } break; } INPUT[] ins = new INPUT[2]; ins[0].type = INPUT_KEYBOARD; ins[0].U.ki = new KEYBDINPUT { wVk = vk, dwFlags = 0 }; ins[1].type = INPUT_KEYBOARD; ins[1].U.ki = new KEYBDINPUT { wVk = vk, dwFlags = KEYEVENTF_KEYUP }; if (SendInput(2, ins, INPUT.Size) != 2) Debug.WriteLine($"[ERROR] SendMediaKey: SendInput failed: {Marshal.GetLastWin32Error()}"); }
+        private void SendTextAction(string text) { if (string.IsNullOrEmpty(text)) return; Debug.WriteLine($"[INFO] SendText: '{text}'"); try { _inputSimulator.Keyboard.TextEntry(text); } catch (Exception ex) { Debug.WriteLine($"[ERROR] SendText: {ex.Message}"); } }
+        private void RunApplicationAction(string? path) { if (string.IsNullOrWhiteSpace(path)) { Debug.WriteLine("[WARN] RunApp: null/empty path."); return; } try { Process.Start(path); } catch (Exception ex) { Debug.WriteLine($"[ERROR] RunApp '{path}': {ex.Message}"); } }
+        private void OpenUrlAction(string? url) { if (string.IsNullOrWhiteSpace(url)) { Debug.WriteLine("[WARN] OpenUrl: null/empty URL."); return; } try { string pUrl = url; if (!pUrl.Contains("://")) pUrl = "http://" + pUrl; Process.Start(new ProcessStartInfo(pUrl) { UseShellExecute = true }); } catch (Exception ex) { Debug.WriteLine($"[ERROR] OpenUrl '{url}': {ex.Message}"); } }
+        private void TriggerHotkeyOrCommandAction(string? param, string? secParam) { if (string.IsNullOrWhiteSpace(param)) { Debug.WriteLine("[WARN] TriggerHotkey: null/empty param."); return; } string type = secParam?.ToUpperInvariant() ?? "COMMAND"; if (type == "HOTKEY") { Debug.WriteLine($"[INFO] TriggerHotkey: '{param}'"); try { List<VirtualKeyCode> mods = new List<VirtualKeyCode>(), keys = new List<VirtualKeyCode>(); foreach (string p in param.Split('+')) { string tp = p.Trim().ToUpperInvariant(); switch (tp) { case "CTRL": case "CONTROL": mods.Add(VirtualKeyCode.CONTROL); break; case "SHIFT": mods.Add(VirtualKeyCode.SHIFT); break; case "ALT": case "MENU": mods.Add(VirtualKeyCode.MENU); break; case "WIN": case "WINDOWS": mods.Add(VirtualKeyCode.LWIN); break; default: if (Enum.TryParse<VirtualKeyCode>(tp, true, out var vk)) keys.Add(vk); else if (tp.Length == 1 && Enum.TryParse<VirtualKeyCode>("VK_" + tp[0], true, out var cvk)) keys.Add(cvk); else Debug.WriteLine($"[WARN] Hotkey parse: Unknown '{tp}'."); break; } } if (keys.Any()) { if (mods.Any()) _inputSimulator.Keyboard.ModifiedKeyStroke(mods, keys); else _inputSimulator.Keyboard.KeyPress(keys.ToArray()); } else if (mods.Any()) _inputSimulator.Keyboard.KeyPress(mods.ToArray()); else Debug.WriteLine($"[WARN] Hotkey parse: No valid keys/mods in '{param}'."); } catch (Exception ex) { Debug.WriteLine($"[ERROR] TriggerHotkey: {ex.Message}"); } } else { Debug.WriteLine($"[INFO] Executing command: '{param}'"); try { Process.Start(new ProcessStartInfo("cmd.exe", $"/c \"{param}\"") { WindowStyle = ProcessWindowStyle.Hidden, CreateNoWindow = true, UseShellExecute = false }); } catch (Exception ex) { Debug.WriteLine($"[ERROR] Executing command '{param}': {ex.Message}"); } } }
+
+        #endregion
+
+        #region Brightness Control Methods (WMI)
+
+        /// <summary>
+        /// Gets the current screen brightness.
+        /// </summary>
+        /// <returns>Current brightness percentage (0-100), or -1 if an error occurs.</returns>
+        private int GetCurrentBrightness()
+        {
+            try
             {
-                case "VOLUMEMUTE": case "MUTE": vkCode = VK_VOLUME_MUTE; break;
-                case "VOLUMEDOWN": vkCode = VK_VOLUME_DOWN; break;
-                case "VOLUMEUP": vkCode = VK_VOLUME_UP; break;
-                case "MEDIANEXTTRACK": case "NEXT": vkCode = VK_MEDIA_NEXT_TRACK; break;
-                case "MEDIAPREVIOUSTRACK": case "PREVIOUS": case "PREV": vkCode = VK_MEDIA_PREV_TRACK; break;
-                case "MEDIASTOP": case "STOP": vkCode = VK_MEDIA_STOP; break;
-                case "MEDIAPLAYPAUSE": case "PLAYPAUSE": case "PLAY": case "PAUSE": vkCode = VK_MEDIA_PLAY_PAUSE; break;
-                // Đại ca có thể thêm các media key khác ở đây nếu cần (ví dụ: VK_BROWSER_*, VK_LAUNCH_MAIL, ...)
-                default:
-                    // Thử parse nếu mediaKeyName là một số (mã VK)
-                    if (!ushort.TryParse(mediaKeyName, out vkCode))
+                ManagementScope scope = new ManagementScope("root\\WMI"); // [cite: 344]
+                SelectQuery query = new SelectQuery("WmiMonitorBrightness"); // [cite: 345]
+
+                using (ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query))
+                {
+                    using (ManagementObjectCollection objectCollection = searcher.Get())
                     {
-                        Debug.WriteLine($"[WARN] SendMediaKeyAction: Unknown media key name or invalid VK code '{mediaKeyName}'");
-                        return;
+                        foreach (ManagementObject mObj in objectCollection) // [cite: 346]
+                        {
+                            object brightnessObj = mObj["CurrentBrightness"]; // Lấy giá trị dưới dạng object trước
+                            if (brightnessObj != null) // [cite: 347]
+                            {
+                                Debug.WriteLine($"[DEBUG] GetCurrentBrightness: Raw WMI CurrentBrightness value: '{brightnessObj}', Type: '{brightnessObj.GetType().FullName}'");
+                                try
+                                {
+                                    // WMI CurrentBrightness thường là byte (0-100).
+                                    // Thử chuyển đổi sang byte trước, sau đó sang int.
+                                    byte byteBrightness = Convert.ToByte(brightnessObj);
+                                    return (int)byteBrightness; // An toàn hơn là Convert.ToInt32 trực tiếp
+                                }
+                                catch (FormatException fe)
+                                {
+                                    Debug.WriteLine($"[ERROR] GetCurrentBrightness: FormatException converting brightness value '{brightnessObj}'. {fe.Message}");
+                                }
+                                catch (InvalidCastException ice) // Bắt lỗi ép kiểu cụ thể
+                                {
+                                    Debug.WriteLine($"[ERROR] GetCurrentBrightness: InvalidCastException converting brightness value '{brightnessObj}'. {ice.Message}");
+                                    // Có thể thử một số cách chuyển đổi khác nếu cần, ví dụ nếu nó là string
+                                    if (brightnessObj is string strVal && byte.TryParse(strVal, out byte parsedByte))
+                                    {
+                                        Debug.WriteLine($"[DEBUG] GetCurrentBrightness: Successfully parsed brightness string '{strVal}' to byte '{parsedByte}'.");
+                                        return (int)parsedByte;
+                                    }
+                                }
+                                catch (OverflowException oe)
+                                {
+                                    Debug.WriteLine($"[ERROR] GetCurrentBrightness: OverflowException converting brightness value '{brightnessObj}'. {oe.Message}");
+                                }
+                            }
+                            // Chỉ cần lấy độ sáng của màn hình đầu tiên tìm thấy
+                            break;
+                        }
                     }
-                    break;
-            }
-
-            INPUT[] inputs = new INPUT[2];
-            IntPtr extraInfo = GetMessageExtraInfo();
-
-            // Key down
-            inputs[0].type = INPUT_KEYBOARD;
-            inputs[0].U.ki = new KEYBDINPUT
-            {
-                wVk = vkCode,
-                wScan = 0, // 0 for virtual key codes
-                // KEYEVENTF_EXTENDEDKEY không thực sự cần cho hầu hết các phím media này, nhưng để cũng không sao.
-                dwFlags = 0, // Bỏ KEYEVENTF_EXTENDEDKEY nếu không cần thiết
-                time = 0,
-                dwExtraInfo = extraInfo
-            };
-
-            // Key up
-            inputs[1].type = INPUT_KEYBOARD;
-            inputs[1].U.ki = new KEYBDINPUT
-            {
-                wVk = vkCode,
-                wScan = 0,
-                dwFlags = KEYEVENTF_KEYUP, // Thêm KEYEVENTF_EXTENDEDKEY nếu đã dùng ở key down
-                time = 0,
-                dwExtraInfo = extraInfo
-            };
-
-            uint inputsSent = SendInput((uint)inputs.Length, inputs, INPUT.Size);
-            if (inputsSent != inputs.Length)
-            {
-                Debug.WriteLine($"[ERROR] SendMediaKeyAction: SendInput failed to send all inputs. Error code: {Marshal.GetLastWin32Error()}");
-            }
-        }
-
-        /// <summary>
-        /// <para>Sends a string of text, simulating keyboard typing.</para>
-        /// <para>Gửi một chuỗi văn bản, mô phỏng việc gõ phím.</para>
-        /// <para>WARNING: This implementation is a placeholder. Full text simulation via SendInput is complex.</para>
-        /// <para>CẢNH BÁO: Việc triển khai này là một placeholder. Mô phỏng văn bản đầy đủ qua SendInput rất phức tạp.</para>
-        /// </summary>
-        private void SendTextAction(string textToSend) // textToSend được đảm bảo non-null từ ExecuteAction
-        {
-            if (string.IsNullOrEmpty(textToSend)) return;
-
-            Debug.WriteLine($"[INFO] SendTextAction: Action to send text '{textToSend}' triggered.");
-
-            // --- Lựa chọn 1: Sử dụng System.Windows.Forms.SendKeys.SendWait() ---
-            // **Ưu điểm**: Đơn giản để triển khai.
-            // **Nhược điểm**:
-            //    1. Tạo phụ thuộc vào System.Windows.Forms trong project Core (không lý tưởng).
-            //    2. Phụ thuộc vào cửa sổ đang có focus. Có thể không hoạt động đúng nếu ứng dụng chạy nền hoặc không có UI focus.
-            //    3. Cần xử lý (escape) các ký tự đặc biệt của SendKeys: +, ^, %, ~, (, ), [, ].
-            /*
-            try
-            {
-                // Cần thêm using System.Windows.Forms; ở đầu file nếu dùng cách này
-                // Và project QuickFnMapper.Core cần tham chiếu đến System.Windows.Forms.dll
-                // string escapedText = EscapeSendKeysText(textToSend); // Hàm escape tự viết
-                // SendKeys.SendWait(escapedText);
-                Debug.WriteLine($"[PLACEHOLDER] Would use SendKeys.SendWait for: {textToSend}. Ensure project references and handles special characters.");
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ERROR] SendTextAction with SendKeys: {ex.Message}");
-            }
-            */
-
-            // --- Lựa chọn 2: Triển khai bằng SendInput (Phức tạp) ---
-            // Gửi từng ký tự một, xử lý Unicode (KEYEVENTF_UNICODE), trạng thái Shift, v.v.
-            // Đây là một tác vụ không hề nhỏ.
-            // Dưới đây là một ví dụ rất, rất cơ bản chỉ gửi ký tự ASCII không có Shift.
-            /*
-            List<INPUT> inputs = new List<INPUT>();
-            IntPtr extraInfo = GetMessageExtraInfo();
-
-            foreach (char c in textToSend)
-            {
-                ushort vkCode = (ushort)char.ToUpper(c); // Lấy VK code (rất thô sơ, không đúng cho nhiều ký tự)
-                                                       // Cần một hàm MapCharToVkScan đầy đủ hơn.
-                
-                // Key down
-                KEYBDINPUT kd = new KEYBDINPUT();
-                kd.wVk = vkCode; 
-                // kd.wScan = 0; // Hoặc scan code nếu dùng KEYEVENTF_SCANCODE
-                // kd.dwFlags = 0; // Hoặc KEYEVENTF_UNICODE nếu wScan là char code
-                kd.time = 0;
-                kd.dwExtraInfo = extraInfo;
-                inputs.Add(new INPUT { type = INPUT_KEYBOARD, U = new InputUnion { ki = kd } });
-
-                // Key up
-                KEYBDINPUT ku = new KEYBDINPUT();
-                ku.wVk = vkCode;
-                // ku.wScan = 0;
-                ku.dwFlags = KEYEVENTF_KEYUP; // Thêm KEYEVENTF_UNICODE nếu dùng ở key down
-                ku.time = 0;
-                ku.dwExtraInfo = extraInfo;
-                inputs.Add(new INPUT { type = INPUT_KEYBOARD, U = new InputUnion { ki = ku } });
-            }
-            if (inputs.Count > 0)
-            {
-                SendInput((uint)inputs.Count, inputs.ToArray(), INPUT.Size);
-            }
-            */
-            Debug.WriteLine("[WARN] SendTextAction: Full implementation via SendInput is complex and not provided here. Consider using a dedicated library or a simpler approach like SendKeys (with caveats).");
-
-            // --- Lựa chọn 3: Sử dụng thư viện ngoài (ví dụ: InputSimulatorPlus trên NuGet) ---
-            // Thêm thư viện vào project và sử dụng API của nó.
-            // Ví dụ (giả sử đã cài InputSimulatorPlus):
-            // WindowsInput.InputSimulator sim = new WindowsInput.InputSimulator();
-            // sim.Keyboard.TextEntry(textToSend);
-        }
-
-        /// <summary>
-        /// <para>Runs an application specified by its path.</para>
-        /// <para>Chạy một ứng dụng được chỉ định bởi đường dẫn của nó.</para>
-        /// </summary>
-        private void RunApplicationAction(string? applicationPath)
-        {
-            if (string.IsNullOrWhiteSpace(applicationPath))
-            {
-                Debug.WriteLine("[WARN] RunApplicationAction: Application path is null or empty.");
-                return;
-            }
-            try
-            {
-                Process.Start(applicationPath);
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ERROR] RunApplicationAction: Failed to start application '{applicationPath}'. {ex.Message}");
-                // Có thể hiển thị lỗi cho người dùng
-            }
-        }
-
-        /// <summary>
-        /// <para>Opens a URL in the default web browser.</para>
-        /// <para>Mở một địa chỉ URL trong trình duyệt web mặc định.</para>
-        /// </summary>
-        private void OpenUrlAction(string? url)
-        {
-            if (string.IsNullOrWhiteSpace(url))
-            {
-                Debug.WriteLine("[WARN] OpenUrlAction: URL is null or empty.");
-                return;
-            }
-            try
-            {
-                // Đảm bảo URL có scheme (http, https)
-                string processedUrl = url;
-                if (!processedUrl.Contains("://"))
-                {
-                    processedUrl = "http://" + processedUrl;
                 }
-                Process.Start(new ProcessStartInfo(processedUrl) { UseShellExecute = true });
+                Debug.WriteLine("[WARN] GetCurrentBrightness: WmiMonitorBrightness instance not found or CurrentBrightness property is null/unconvertible."); // [cite: 349]
+            }
+            catch (ManagementException mex) // Bắt lỗi cụ thể từ WMI
+            {
+                Debug.WriteLine($"[ERROR] GetCurrentBrightness (ManagementException): {mex.Message}. ErrorCode: {mex.ErrorCode}. WMI may not be available or supported.");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[ERROR] OpenUrlAction: Failed to open URL '{url}'. {ex.Message}");
+                Debug.WriteLine($"[ERROR] GetCurrentBrightness (General Exception): {ex.Message}"); // [cite: 350]
             }
+            return -1; // [cite: 351]
         }
+
         /// <summary>
-        /// <para>Triggers another hotkey or executes a system command.</para>
-        /// <para>Kích hoạt một phím nóng khác hoặc thực thi một lệnh hệ thống.</para>
-        /// <para>ActionParameter: The hotkey string (e.g., "^C" for Ctrl+C) or command line.</para>
-        /// <para>Tham số Hành động: Chuỗi phím nóng (VD: "^C" cho Ctrl+C) hoặc dòng lệnh.</para>
-        /// <para>ActionParameterSecondary: "Hotkey" or "Command" to distinguish.</para>
-        /// <para>Tham số Hành động Phụ: "Hotkey" hoặc "Command" để phân biệt.</para>
+        /// Sets the screen brightness.
         /// </summary>
-        private void TriggerHotkeyOrCommandAction(string? parameter, string? secondaryParameter)
+        /// <param name="targetBrightness">Target brightness percentage (0-100).</param>
+        private void SetTargetBrightness(byte targetBrightness)
         {
-            if (string.IsNullOrWhiteSpace(parameter))
-            {
-                Debug.WriteLine("[WARN] TriggerHotkeyOrCommandAction: Parameter is null or empty.");
-                return;
-            }
+            // Đảm bảo giá trị nằm trong khoảng 0-100 (byte đã là không âm)
+            if (targetBrightness > 100) targetBrightness = 100; // [cite: 353]
 
-            string type = secondaryParameter?.ToUpperInvariant() ?? "COMMAND"; // Mặc định là Command nếu không rõ
-
-            if (type == "HOTKEY")
+            try
             {
-                Debug.WriteLine($"[INFO] TriggerHotkeyOrCommandAction: Simulating hotkey: '{parameter}'");
-                // Logic để parse 'parameter' (ví dụ: "^C", "%{F4}") và sử dụng SendInput để gửi tổ hợp phím đó.
-                // Việc này khá phức tạp, tương tự như SendTextAction nhưng cần phân tích các modifier.
-                // Ví dụ rất đơn giản nếu parameter chỉ là một Virtual Key Code dạng số:
-                // if (ushort.TryParse(parameter, out ushort vkCode))
-                // {
-                //    // Gửi vkCode này bằng SendInput (down and up)
-                // }
-                // else 
-                // { // Parse chuỗi như SendKeys (ví dụ: "^" cho Ctrl, "%" cho Alt, "+" cho Shift)
-                //    // SendKeys.SendWait(parameter); // Lại là vấn đề của SendKeys
-                // }
-                Debug.WriteLine("[WARN] TriggerHotkeyOrCommandAction (Hotkey): Full implementation via SendInput is complex. Consider SendKeys or a library.");
-            }
-            else // Mặc định hoặc type == "COMMAND"
-            {
-                Debug.WriteLine($"[INFO] TriggerHotkeyOrCommandAction: Executing command: '{parameter}'");
-                try
+                ManagementScope scope = new ManagementScope("root\\WMI"); // [cite: 354]
+                SelectQuery query = new SelectQuery("WmiMonitorBrightnessMethods"); // [cite: 355]
+                using (ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query))
                 {
-                    Process.Start(new ProcessStartInfo
+                    using (ManagementObjectCollection objectCollection = searcher.Get())
                     {
-                        FileName = "cmd.exe",
-                        Arguments = $"/c \"{parameter}\"", // /c để chạy lệnh rồi thoát
-                        WindowStyle = ProcessWindowStyle.Hidden, // Ẩn cửa sổ cmd
-                        CreateNoWindow = true, // Không tạo cửa sổ mới
-                        UseShellExecute = false // Cần false để redirect output nếu muốn, hoặc để chạy cmd với arguments
-                    });
+                        if (objectCollection.Count == 0)
+                        {
+                            Debug.WriteLine("[WARN] SetTargetBrightness: WmiMonitorBrightnessMethods instance not found. Cannot set brightness.");
+                            OnNotificationRequested(new NotificationEventArgs.NotificationInfo(
+                                "Brightness Error", "Could not find a WMI object to control screen brightness.", NotificationType.Error));
+                            return;
+                        }
+
+                        foreach (ManagementObject mObj in objectCollection) // [cite: 356]
+                        {
+                            // Tham số đầu tiên của WmiSetBrightness là timeout (không dùng ở đây), thứ hai là độ sáng
+                            mObj.InvokeMethod("WmiSetBrightness", new object[] { (uint)0, targetBrightness }); // [cite: 357] // Đặt timeout là 0
+                            Debug.WriteLine($"[INFO] SetTargetBrightness: Attempted to set brightness to {targetBrightness}");
+                            // Thông báo cho người dùng rằng lệnh đã được gửi, không nhất thiết phải thành công ngay
+                            // OnNotificationRequested(new NotificationEventArgs.NotificationInfo(
+                            //    "Brightness Control", $"Brightness set to {targetBrightness}%", NotificationType.Info));
+                            return; // Áp dụng cho màn hình đầu tiên tìm thấy
+                        }
+                    }
                 }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[ERROR] TriggerHotkeyOrCommandAction (Command): Failed to execute command '{parameter}'. {ex.Message}");
-                }
+            }
+            catch (ManagementException mex)
+            {
+                Debug.WriteLine($"[ERROR] SetTargetBrightness (ManagementException): {mex.Message}. ErrorCode: {mex.ErrorCode}. WMI may not be available or brightness control not supported.");
+                OnNotificationRequested(new NotificationEventArgs.NotificationInfo(
+                   "Brightness Error", $"Failed to set brightness via WMI: {mex.Message}", NotificationType.Error));
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ERROR] SetTargetBrightness (General Exception): {ex.Message}"); // [cite: 359]
+                OnNotificationRequested(new NotificationEventArgs.NotificationInfo(
+                    "Brightness Error", $"Failed to set brightness: {ex.Message}", NotificationType.Error));
             }
         }
 
+        /// <summary>
+        /// Adjusts the screen brightness based on a relative change string (e.g., "+10", "-10")
+        /// or an absolute value string (e.g., "50").
+        /// </summary>
+        /// <param name="brightnessParameter">The brightness adjustment string.</param>
+        private void AdjustScreenBrightness(string? brightnessParameter)
+        {
+            if (string.IsNullOrWhiteSpace(brightnessParameter)) // [cite: 361]
+            {
+                Debug.WriteLine("[WARN] AdjustScreenBrightness: brightnessParameter is null or empty.");
+                OnNotificationRequested(new NotificationEventArgs.NotificationInfo(
+                    "Brightness Error", "Brightness parameter not provided.", NotificationType.Warning));
+                return;
+            }
+
+            int currentBrightness = GetCurrentBrightness(); // [cite: 362]
+            if (currentBrightness == -1) // [cite: 363]
+            {
+                Debug.WriteLine("[ERROR] AdjustScreenBrightness: Could not retrieve current screen brightness. Cannot adjust.");
+                // GetCurrentBrightness đã có thể bắn ra thông báo lỗi rồi, hoặc thông báo ở đây nếu muốn cụ thể hơn
+                // OnNotificationRequested(new NotificationEventArgs.NotificationInfo(
+                //    "Brightness Error", "Could not retrieve current screen brightness to perform adjustment.", NotificationType.Error)); // [cite: 364]
+                return;
+            }
+
+            int newBrightness = currentBrightness; // [cite: 365]
+            bool isRelative = brightnessParameter.StartsWith("+") || brightnessParameter.StartsWith("-");
+
+            if (int.TryParse(brightnessParameter.TrimStart('+', '-'), System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out int value))
+            {
+                if (isRelative)
+                {
+                    newBrightness = currentBrightness + value * (brightnessParameter.StartsWith("-") ? -1 : 1); // [cite: 366]
+                }
+                else
+                {
+                    newBrightness = value; // [cite: 367]
+                }
+
+                newBrightness = Math.Max(0, Math.Min(100, newBrightness)); // [cite: 368]
+                Debug.WriteLine($"[INFO] AdjustScreenBrightness: Current: {currentBrightness}, Param: '{brightnessParameter}', Target Calculated: {newBrightness}");
+                SetTargetBrightness((byte)newBrightness);
+            }
+            else
+            {
+                Debug.WriteLine($"[ERROR] AdjustScreenBrightness: Invalid brightness parameter format: '{brightnessParameter}'. Expected format like '+10', '-10', or '50'."); // [cite: 369]
+                OnNotificationRequested(new NotificationEventArgs.NotificationInfo( // [cite: 370]
+                     "Brightness Error", $"Invalid brightness parameter: '{brightnessParameter}'. Use numbers e.g. '+10', '-10', or '50'.", NotificationType.Error));
+            }
+        }
         #endregion
     }
 }

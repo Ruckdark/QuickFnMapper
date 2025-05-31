@@ -51,7 +51,9 @@ namespace QuickFnMapper.Core.Models
         /// <para>Triggers another defined hotkey or a system command.</para>
         /// <para>Kích hoạt một phím nóng đã định nghĩa khác hoặc một lệnh hệ thống.</para>
         /// </summary>
-        TriggerHotkeyOrCommand
+        TriggerHotkeyOrCommand,
+
+        SetScreenBrightness
         // Future action types can be added here / Các loại hành động trong tương lai có thể được thêm vào đây
     }
 

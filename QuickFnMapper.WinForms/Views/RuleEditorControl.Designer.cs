@@ -1,21 +1,17 @@
-﻿namespace QuickFnMapper.WinForms.Views
+﻿// MINH HỌA - ĐẠI CA NÊN DÙNG VISUAL STUDIO DESIGNER ĐỂ TẠO FILE NÀY
+namespace QuickFnMapper.WinForms.Views
 {
     partial class RuleEditorControl
     {
         /// <summary> 
-        /// <para>Required designer variable.</para>
-        /// <para>Biến thiết kế bắt buộc.</para>
+        /// Required designer variable.
         /// </summary>
         private System.ComponentModel.IContainer components = null;
 
         /// <summary> 
-        /// <para>Clean up any resources being used.</para>
-        /// <para>Dọn dẹp mọi tài nguyên đang được sử dụng.</para>
+        /// Clean up any resources being used.
         /// </summary>
-        /// <param name="disposing">
-        /// <para>true if managed resources should be disposed; otherwise, false.</para>
-        /// <para>true nếu các tài nguyên được quản lý nên được giải phóng; ngược lại, false.</para>
-        /// </param>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
         protected override void Dispose(bool disposing)
         {
             if (disposing && (components != null))
@@ -28,235 +24,243 @@
         #region Component Designer generated code
 
         /// <summary> 
-        /// <para>Required method for Designer support - do not modify</para> 
-        /// <para>the contents of this method with the code editor.</para>
-        /// <para>Phương thức bắt buộc cho hỗ trợ Designer - không sửa đổi</para>
-        /// <para>nội dung của phương thức này bằng trình soạn thảo mã.</para>
+        /// Required method for Designer support - do not modify 
+        /// the contents of this method with the code editor.
         /// </summary>
         private void InitializeComponent()
         {
-            this.lblRuleName = new System.Windows.Forms.Label();
-            this.txtRuleName = new System.Windows.Forms.TextBox();
-            this.chkRuleEnabled = new System.Windows.Forms.CheckBox();
-            this.grpOriginalKey = new System.Windows.Forms.GroupBox();
-            this.txtOriginalKeyDisplay = new System.Windows.Forms.TextBox();
-            this.btnCaptureKey = new System.Windows.Forms.Button();
-            this.grpTargetAction = new System.Windows.Forms.GroupBox();
-            this.lblActionParameterSecondaryPrompt = new System.Windows.Forms.Label();
-            this.txtActionParameterSecondary = new System.Windows.Forms.TextBox();
-            this.lblActionParameterPrompt = new System.Windows.Forms.Label();
-            this.txtActionParameter = new System.Windows.Forms.TextBox();
-            this.cmbActionType = new System.Windows.Forms.ComboBox();
-            this.lblActionType = new System.Windows.Forms.Label();
-            this.lblOrder = new System.Windows.Forms.Label();
-            this.numOrder = new System.Windows.Forms.NumericUpDown();
-            this.btnSaveRule = new System.Windows.Forms.Button();
-            this.btnCancelRule = new System.Windows.Forms.Button();
-            this.grpOriginalKey.SuspendLayout();
-            this.grpTargetAction.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.numOrder)).BeginInit();
-            this.SuspendLayout();
+            lblRuleName = new Label();
+            txtRuleName = new TextBox();
+            chkRuleEnabled = new CheckBox();
+            grpOriginalKey = new GroupBox();
+            txtOriginalKeyDisplay = new TextBox();
+            btnCaptureKey = new Button();
+            grpTargetAction = new GroupBox();
+            lblActionParameterSecondaryPrompt = new Label();
+            txtActionParameterSecondary = new TextBox();
+            lblActionParameterPrompt = new Label();
+            txtActionParameter = new TextBox();
+            cmbActionType = new ComboBox();
+            lblActionType = new Label();
+            lblOrder = new Label();
+            numOrder = new NumericUpDown();
+            btnSaveRule = new Button();
+            btnCancelRule = new Button();
+            grpOriginalKey.SuspendLayout();
+            grpTargetAction.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)numOrder).BeginInit();
+            SuspendLayout();
             // 
             // lblRuleName
             // 
-            this.lblRuleName.AutoSize = true;
-            this.lblRuleName.Location = new System.Drawing.Point(15, 18);
-            this.lblRuleName.Name = "lblRuleName";
-            this.lblRuleName.Size = new System.Drawing.Size(63, 13);
-            this.lblRuleName.TabIndex = 0;
-            this.lblRuleName.Text = "Rule Name:";
+            lblRuleName.AutoSize = true;
+            lblRuleName.Font = new Font("Segoe UI", 9F);
+            lblRuleName.Location = new Point(17, 20);
+            lblRuleName.Name = "lblRuleName";
+            lblRuleName.Size = new Size(102, 25);
+            lblRuleName.TabIndex = 0;
+            lblRuleName.Text = "Rule Name:";
             // 
             // txtRuleName
             // 
-            this.txtRuleName.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtRuleName.Location = new System.Drawing.Point(100, 15);
-            this.txtRuleName.Name = "txtRuleName";
-            this.txtRuleName.Size = new System.Drawing.Size(327, 20);
-            this.txtRuleName.TabIndex = 1;
+            txtRuleName.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            txtRuleName.Font = new Font("Segoe UI", 9F);
+            txtRuleName.Location = new Point(120, 17);
+            txtRuleName.Name = "txtRuleName";
+            txtRuleName.Size = new Size(831, 31);
+            txtRuleName.TabIndex = 1;
             // 
             // chkRuleEnabled
             // 
-            this.chkRuleEnabled.AutoSize = true;
-            this.chkRuleEnabled.Location = new System.Drawing.Point(100, 41);
-            this.chkRuleEnabled.Name = "chkRuleEnabled";
-            this.chkRuleEnabled.Size = new System.Drawing.Size(94, 17);
-            this.chkRuleEnabled.TabIndex = 2;
-            this.chkRuleEnabled.Text = "Rule Enabled";
-            this.chkRuleEnabled.UseVisualStyleBackColor = true;
+            chkRuleEnabled.AutoSize = true;
+            chkRuleEnabled.Font = new Font("Segoe UI", 9F);
+            chkRuleEnabled.Location = new Point(120, 46);
+            chkRuleEnabled.Name = "chkRuleEnabled";
+            chkRuleEnabled.Size = new Size(140, 29);
+            chkRuleEnabled.TabIndex = 2;
+            chkRuleEnabled.Text = "Rule Enabled";
+            chkRuleEnabled.UseVisualStyleBackColor = true;
             // 
             // grpOriginalKey
             // 
-            this.grpOriginalKey.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.grpOriginalKey.Controls.Add(this.txtOriginalKeyDisplay);
-            this.grpOriginalKey.Controls.Add(this.btnCaptureKey);
-            this.grpOriginalKey.Location = new System.Drawing.Point(18, 70);
-            this.grpOriginalKey.Name = "grpOriginalKey";
-            this.grpOriginalKey.Size = new System.Drawing.Size(409, 60);
-            this.grpOriginalKey.TabIndex = 3;
-            this.grpOriginalKey.TabStop = false;
-            this.grpOriginalKey.Text = "Original Key Combination";
+            grpOriginalKey.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            grpOriginalKey.Controls.Add(txtOriginalKeyDisplay);
+            grpOriginalKey.Controls.Add(btnCaptureKey);
+            grpOriginalKey.Font = new Font("Segoe UI", 9F);
+            grpOriginalKey.Location = new Point(20, 78);
+            grpOriginalKey.Name = "grpOriginalKey";
+            grpOriginalKey.Padding = new Padding(10, 5, 10, 10);
+            grpOriginalKey.Size = new Size(931, 65);
+            grpOriginalKey.TabIndex = 3;
+            grpOriginalKey.TabStop = false;
+            grpOriginalKey.Text = "Original Key Combination";
             // 
             // txtOriginalKeyDisplay
             // 
-            this.txtOriginalKeyDisplay.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtOriginalKeyDisplay.Location = new System.Drawing.Point(9, 23);
-            this.txtOriginalKeyDisplay.Name = "txtOriginalKeyDisplay";
-            this.txtOriginalKeyDisplay.ReadOnly = true;
-            this.txtOriginalKeyDisplay.Size = new System.Drawing.Size(299, 20);
-            this.txtOriginalKeyDisplay.TabIndex = 0;
-            this.txtOriginalKeyDisplay.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
+            txtOriginalKeyDisplay.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            txtOriginalKeyDisplay.Location = new Point(13, 25);
+            txtOriginalKeyDisplay.Name = "txtOriginalKeyDisplay";
+            txtOriginalKeyDisplay.ReadOnly = true;
+            txtOriginalKeyDisplay.Size = new Size(801, 31);
+            txtOriginalKeyDisplay.TabIndex = 0;
+            txtOriginalKeyDisplay.TextAlign = HorizontalAlignment.Center;
+            txtOriginalKeyDisplay.Enter += txtOriginalKeyDisplay_Enter;
+            txtOriginalKeyDisplay.KeyDown += txtOriginalKeyDisplay_KeyDown;
+            txtOriginalKeyDisplay.Leave += txtOriginalKeyDisplay_Leave;
             // 
             // btnCaptureKey
             // 
-            this.btnCaptureKey.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnCaptureKey.Location = new System.Drawing.Point(314, 21);
-            this.btnCaptureKey.Name = "btnCaptureKey";
-            this.btnCaptureKey.Size = new System.Drawing.Size(89, 23);
-            this.btnCaptureKey.TabIndex = 1;
-            this.btnCaptureKey.Text = "Capture Key...";
-            this.btnCaptureKey.UseVisualStyleBackColor = true;
-            // this.btnCaptureKey.Click += new System.EventHandler(this.btnCaptureKey_Click); // Đại ca cần tạo handler này trong RuleEditorControl.cs
+            btnCaptureKey.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+            btnCaptureKey.Location = new Point(820, 24);
+            btnCaptureKey.Name = "btnCaptureKey";
+            btnCaptureKey.Size = new Size(98, 32);
+            btnCaptureKey.TabIndex = 1;
+            btnCaptureKey.Text = "Ca&pture Key";
+            btnCaptureKey.UseVisualStyleBackColor = true;
+            btnCaptureKey.Click += btnCaptureKey_Click;
             // 
             // grpTargetAction
             // 
-            this.grpTargetAction.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.grpTargetAction.Controls.Add(this.lblActionParameterSecondaryPrompt);
-            this.grpTargetAction.Controls.Add(this.txtActionParameterSecondary);
-            this.grpTargetAction.Controls.Add(this.lblActionParameterPrompt);
-            this.grpTargetAction.Controls.Add(this.txtActionParameter);
-            this.grpTargetAction.Controls.Add(this.cmbActionType);
-            this.grpTargetAction.Controls.Add(this.lblActionType);
-            this.grpTargetAction.Location = new System.Drawing.Point(18, 140);
-            this.grpTargetAction.Name = "grpTargetAction";
-            this.grpTargetAction.Size = new System.Drawing.Size(409, 130);
-            this.grpTargetAction.TabIndex = 4;
-            this.grpTargetAction.TabStop = false;
-            this.grpTargetAction.Text = "Target Action";
+            grpTargetAction.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            grpTargetAction.Controls.Add(lblActionParameterSecondaryPrompt);
+            grpTargetAction.Controls.Add(txtActionParameterSecondary);
+            grpTargetAction.Controls.Add(lblActionParameterPrompt);
+            grpTargetAction.Controls.Add(txtActionParameter);
+            grpTargetAction.Controls.Add(cmbActionType);
+            grpTargetAction.Controls.Add(lblActionType);
+            grpTargetAction.Font = new Font("Segoe UI", 9F);
+            grpTargetAction.Location = new Point(20, 155);
+            grpTargetAction.Name = "grpTargetAction";
+            grpTargetAction.Padding = new Padding(10, 5, 10, 10);
+            grpTargetAction.Size = new Size(931, 130);
+            grpTargetAction.TabIndex = 4;
+            grpTargetAction.TabStop = false;
+            grpTargetAction.Text = "Target Action";
             // 
             // lblActionParameterSecondaryPrompt
             // 
-            this.lblActionParameterSecondaryPrompt.AutoSize = true;
-            this.lblActionParameterSecondaryPrompt.Location = new System.Drawing.Point(6, 94);
-            this.lblActionParameterSecondaryPrompt.Name = "lblActionParameterSecondaryPrompt";
-            this.lblActionParameterSecondaryPrompt.Size = new System.Drawing.Size(115, 13);
-            this.lblActionParameterSecondaryPrompt.TabIndex = 5;
-            this.lblActionParameterSecondaryPrompt.Text = "Secondary Parameter:";
-            this.lblActionParameterSecondaryPrompt.Visible = false; // Sẽ được ConfigureActionParameterControls quản lý
+            lblActionParameterSecondaryPrompt.AutoSize = true;
+            lblActionParameterSecondaryPrompt.Location = new Point(10, 92);
+            lblActionParameterSecondaryPrompt.Name = "lblActionParameterSecondaryPrompt";
+            lblActionParameterSecondaryPrompt.Size = new Size(131, 25);
+            lblActionParameterSecondaryPrompt.TabIndex = 4;
+            lblActionParameterSecondaryPrompt.Text = "Sec. Parameter:";
+            lblActionParameterSecondaryPrompt.Visible = false;
             // 
             // txtActionParameterSecondary
             // 
-            this.txtActionParameterSecondary.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtActionParameterSecondary.Location = new System.Drawing.Point(127, 91);
-            this.txtActionParameterSecondary.Name = "txtActionParameterSecondary";
-            this.txtActionParameterSecondary.Size = new System.Drawing.Size(276, 20);
-            this.txtActionParameterSecondary.TabIndex = 4;
-            this.txtActionParameterSecondary.Visible = false; // Sẽ được ConfigureActionParameterControls quản lý
+            txtActionParameterSecondary.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            txtActionParameterSecondary.Location = new Point(147, 89);
+            txtActionParameterSecondary.Name = "txtActionParameterSecondary";
+            txtActionParameterSecondary.Size = new Size(771, 31);
+            txtActionParameterSecondary.TabIndex = 5;
+            txtActionParameterSecondary.Visible = false;
             // 
             // lblActionParameterPrompt
             // 
-            this.lblActionParameterPrompt.AutoSize = true;
-            this.lblActionParameterPrompt.Location = new System.Drawing.Point(6, 60);
-            this.lblActionParameterPrompt.Name = "lblActionParameterPrompt";
-            this.lblActionParameterPrompt.Size = new System.Drawing.Size(95, 13);
-            this.lblActionParameterPrompt.TabIndex = 3;
-            this.lblActionParameterPrompt.Text = "Action Parameter:";
+            lblActionParameterPrompt.AutoSize = true;
+            lblActionParameterPrompt.Location = new Point(10, 60);
+            lblActionParameterPrompt.Name = "lblActionParameterPrompt";
+            lblActionParameterPrompt.Size = new Size(95, 25);
+            lblActionParameterPrompt.TabIndex = 2;
+            lblActionParameterPrompt.Text = "Parameter:";
             // 
             // txtActionParameter
             // 
-            this.txtActionParameter.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.txtActionParameter.Location = new System.Drawing.Point(127, 57);
-            this.txtActionParameter.Name = "txtActionParameter";
-            this.txtActionParameter.Size = new System.Drawing.Size(276, 20);
-            this.txtActionParameter.TabIndex = 2;
+            txtActionParameter.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            txtActionParameter.Location = new Point(147, 57);
+            txtActionParameter.Name = "txtActionParameter";
+            txtActionParameter.Size = new Size(771, 31);
+            txtActionParameter.TabIndex = 3;
             // 
             // cmbActionType
             // 
-            this.cmbActionType.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.cmbActionType.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cmbActionType.FormattingEnabled = true;
-            this.cmbActionType.Location = new System.Drawing.Point(127, 23);
-            this.cmbActionType.Name = "cmbActionType";
-            this.cmbActionType.Size = new System.Drawing.Size(276, 21);
-            this.cmbActionType.TabIndex = 1;
-            // this.cmbActionType.SelectedIndexChanged += new System.EventHandler(this.CmbActionType_SelectedIndexChanged); // Đã đăng ký trong code-behind
+            cmbActionType.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
+            cmbActionType.DropDownStyle = ComboBoxStyle.DropDownList;
+            cmbActionType.FormattingEnabled = true;
+            cmbActionType.Location = new Point(147, 25);
+            cmbActionType.Name = "cmbActionType";
+            cmbActionType.Size = new Size(771, 33);
+            cmbActionType.TabIndex = 1;
+            cmbActionType.SelectedIndexChanged += cmbActionType_SelectedIndexChanged;
             // 
             // lblActionType
             // 
-            this.lblActionType.AutoSize = true;
-            this.lblActionType.Location = new System.Drawing.Point(6, 26);
-            this.lblActionType.Name = "lblActionType";
-            this.lblActionType.Size = new System.Drawing.Size(68, 13);
-            this.lblActionType.TabIndex = 0;
-            this.lblActionType.Text = "Action Type:";
+            lblActionType.AutoSize = true;
+            lblActionType.Location = new Point(10, 28);
+            lblActionType.Name = "lblActionType";
+            lblActionType.Size = new Size(109, 25);
+            lblActionType.TabIndex = 0;
+            lblActionType.Text = "Action Type:";
             // 
             // lblOrder
             // 
-            this.lblOrder.AutoSize = true;
-            this.lblOrder.Location = new System.Drawing.Point(15, 282);
-            this.lblOrder.Name = "lblOrder";
-            this.lblOrder.Size = new System.Drawing.Size(62, 13);
-            this.lblOrder.TabIndex = 5;
-            this.lblOrder.Text = "Rule Order:";
+            lblOrder.AutoSize = true;
+            lblOrder.Font = new Font("Segoe UI", 9F);
+            lblOrder.Location = new Point(17, 297);
+            lblOrder.Name = "lblOrder";
+            lblOrder.Size = new Size(101, 25);
+            lblOrder.TabIndex = 5;
+            lblOrder.Text = "Rule Order:";
             // 
             // numOrder
             // 
-            this.numOrder.Location = new System.Drawing.Point(100, 280);
-            this.numOrder.Name = "numOrder";
-            this.numOrder.Size = new System.Drawing.Size(120, 20);
-            this.numOrder.TabIndex = 6;
+            numOrder.Font = new Font("Segoe UI", 9F);
+            numOrder.Location = new Point(120, 295);
+            numOrder.Name = "numOrder";
+            numOrder.Size = new Size(70, 31);
+            numOrder.TabIndex = 6;
             // 
             // btnSaveRule
             // 
-            this.btnSaveRule.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnSaveRule.Location = new System.Drawing.Point(271, 315);
-            this.btnSaveRule.Name = "btnSaveRule";
-            this.btnSaveRule.Size = new System.Drawing.Size(75, 23);
-            this.btnSaveRule.TabIndex = 7;
-            this.btnSaveRule.Text = "Save";
-            this.btnSaveRule.UseVisualStyleBackColor = true;
-            // this.btnSaveRule.Click += new System.EventHandler(this.btnSaveRule_Click); // Đã đăng ký trong code-behind
+            btnSaveRule.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+            btnSaveRule.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
+            btnSaveRule.Location = new Point(775, 442);
+            btnSaveRule.Name = "btnSaveRule";
+            btnSaveRule.Size = new Size(85, 43);
+            btnSaveRule.TabIndex = 7;
+            btnSaveRule.Text = "&Save";
+            btnSaveRule.UseVisualStyleBackColor = true;
+            btnSaveRule.Click += btnSaveRule_Click;
             // 
             // btnCancelRule
             // 
-            this.btnCancelRule.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnCancelRule.Location = new System.Drawing.Point(352, 315);
-            this.btnCancelRule.Name = "btnCancelRule";
-            this.btnCancelRule.Size = new System.Drawing.Size(75, 23);
-            this.btnCancelRule.TabIndex = 8;
-            this.btnCancelRule.Text = "Cancel";
-            this.btnCancelRule.UseVisualStyleBackColor = true;
-            // this.btnCancelRule.Click += new System.EventHandler(this.btnCancelRule_Click); // Đã đăng ký trong code-behind
+            btnCancelRule.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+            btnCancelRule.Font = new Font("Segoe UI", 9F);
+            btnCancelRule.Location = new Point(866, 442);
+            btnCancelRule.Name = "btnCancelRule";
+            btnCancelRule.Size = new Size(85, 43);
+            btnCancelRule.TabIndex = 8;
+            btnCancelRule.Text = "&Cancel";
+            btnCancelRule.UseVisualStyleBackColor = true;
+            btnCancelRule.Click += btnCancelRule_Click;
             // 
             // RuleEditorControl
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
-            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.Controls.Add(this.btnCancelRule);
-            this.Controls.Add(this.btnSaveRule);
-            this.Controls.Add(this.numOrder);
-            this.Controls.Add(this.lblOrder);
-            this.Controls.Add(this.grpTargetAction);
-            this.Controls.Add(this.grpOriginalKey);
-            this.Controls.Add(this.chkRuleEnabled);
-            this.Controls.Add(this.txtRuleName);
-            this.Controls.Add(this.lblRuleName);
-            this.Name = "RuleEditorControl";
-            this.Size = new System.Drawing.Size(445, 350); // Kích thước ví dụ
-            // this.Load += new System.EventHandler(this.RuleEditorControl_Load); // Đã đăng ký trong code-behind
-            this.grpOriginalKey.ResumeLayout(false);
-            this.grpOriginalKey.PerformLayout();
-            this.grpTargetAction.ResumeLayout(false);
-            this.grpTargetAction.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.numOrder)).EndInit();
-            this.ResumeLayout(false);
-            this.PerformLayout();
+            AutoScaleDimensions = new SizeF(10F, 25F);
+            AutoScaleMode = AutoScaleMode.Font;
+            BackColor = SystemColors.Window;
+            Controls.Add(btnCancelRule);
+            Controls.Add(btnSaveRule);
+            Controls.Add(numOrder);
+            Controls.Add(lblOrder);
+            Controls.Add(grpTargetAction);
+            Controls.Add(grpOriginalKey);
+            Controls.Add(chkRuleEnabled);
+            Controls.Add(txtRuleName);
+            Controls.Add(lblRuleName);
+            Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            Name = "RuleEditorControl";
+            Padding = new Padding(10);
+            Size = new Size(971, 498);
+            Load += RuleEditorControl_Load;
+            grpOriginalKey.ResumeLayout(false);
+            grpOriginalKey.PerformLayout();
+            grpTargetAction.ResumeLayout(false);
+            grpTargetAction.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)numOrder).EndInit();
+            ResumeLayout(false);
+            PerformLayout();
         }
 
         #endregion

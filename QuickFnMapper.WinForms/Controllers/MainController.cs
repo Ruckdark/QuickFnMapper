@@ -1,72 +1,130 @@
 ﻿#region Using Directives
 using QuickFnMapper.Core.Models;
 using QuickFnMapper.Core.Services;
+using QuickFnMapper.WinForms.Views;
 using QuickFnMapper.WinForms.Views.Interfaces;
+using QuickFnMapper.WinForms.Utils; // Cho ThemeManager
+using QuickFnMapper.WinForms.Themes; // Cho ColorPalette
 using System;
-using System.Collections.Generic; // For IEnumerable
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Drawing; // Cho Color
 using System.Linq;
 using System.Windows.Forms;
-using System.ComponentModel; // For CancelEventArgs
-using System.Diagnostics; // For Debug
 #endregion
 
 namespace QuickFnMapper.WinForms.Controllers
 {
-    /// <summary>
-    /// <para>Controller for the main application window (<see cref="IMainView"/>).</para>
-    /// <para>Manages the overall application state, user interactions from the main view, and coordinates with services.</para>
-    /// <para>Controller cho cửa sổ ứng dụng chính (<see cref="IMainView"/>).</para>
-    /// <para>Quản lý trạng thái tổng thể của ứng dụng, các tương tác người dùng từ view chính, và phối hợp với các dịch vụ.</para>
-    /// </summary>
     public class MainController
     {
         #region Fields
         private readonly IMainView _view;
         private readonly IKeyMappingService _keyMappingService;
         private readonly IAppSettingsService _appSettingsService;
+        private readonly ThemeManager _themeManager; // << THÊM FIELD NÀY
+        private AppSettings _currentAppSettings;
+
+        private RuleEditorController? _ruleEditorController;
+        private SettingsController? _settingsController;
+
+        // ... các fields khác ...
         #endregion
 
-        #region Constructors
-        /// <summary>
-        /// <para>Initializes a new instance of the <see cref="MainController"/> class.</para>
-        /// <para>Khởi tạo một đối tượng mới của lớp <see cref="MainController"/>.</para>
-        /// </summary>
-        public MainController(IMainView view, IKeyMappingService keyMappingService, IAppSettingsService appSettingsService)
+        // Sửa constructor để nhận ThemeManager
+        public MainController(IMainView view,
+                            IKeyMappingService keyMappingService,
+                            IAppSettingsService appSettingsService,
+                            ThemeManager themeManager) // << THÊM THAM SỐ
         {
             _view = view ?? throw new ArgumentNullException(nameof(view));
             _keyMappingService = keyMappingService ?? throw new ArgumentNullException(nameof(keyMappingService));
             _appSettingsService = appSettingsService ?? throw new ArgumentNullException(nameof(appSettingsService));
+            _themeManager = themeManager ?? throw new ArgumentNullException(nameof(themeManager)); // << LƯU LẠI
 
-            // Subscribe to view events
-            _view.ViewLoaded += OnViewLoaded; // View sẽ tự kích hoạt event này khi nó load xong
+            _currentAppSettings = _appSettingsService.LoadSettings();
+
+            // ... các đăng ký event ...
+            _view.ViewLoaded += OnViewLoaded;
             _view.ToggleServiceStatusClicked += OnToggleServiceStatusClicked;
             _view.AddRuleClicked += OnAddRuleClicked;
             _view.EditRuleClicked += OnEditRuleClicked;
             _view.DeleteRuleClicked += OnDeleteRuleClicked;
             _view.OpenSettingsClicked += OnOpenSettingsClicked;
             _view.ViewClosing += OnViewClosing;
+            _keyMappingService.NotificationRequested += OnKeyMappingServiceNotificationRequested;
+        }
+
+        // Giờ đây Đại ca có thể dùng _themeManager trong các phương thức của MainController
+        // Ví dụ:
+        public void UpdateHomeViewData(IHomeView homeView)
+        {
+            if (homeView == null || _themeManager == null) return; // Kiểm tra null
+            _currentAppSettings = _appSettingsService.LoadSettings();
+
+            homeView.WelcomeMessage = "Welcome to QuickFn Mapper!";
+            bool isServiceRunning = _keyMappingService.IsServiceEnabled;
+            homeView.ServiceStatusText = isServiceRunning ? "Service is currently RUNNING" : "Service is currently STOPPED";
+
+            // Sử dụng _themeManager.CurrentPalette ở đây
+            bool isDarkTheme = _themeManager.CurrentPalette.Name?.Contains("Dark") ?? false;
+            homeView.ServiceStatusColor = isServiceRunning ?
+                (isDarkTheme ? Color.LightGreen : Color.DarkGreen) :
+                (isDarkTheme ? Color.LightCoral : Color.DarkRed);
+        }
+
+        public void SettingsEditorSaved() // Được gọi bởi SettingsController
+        {
+            // ... code hiện tại ...
+            _view.IsServiceEnabledUI = _currentAppSettings.IsGlobalHookEnabled;
+
+            // Sử dụng _themeManager đã có trong MainController
+            _themeManager.CheckAndApplyTheme();
+
+            _view.ShowUserNotification("Settings applied successfully.", "Settings Saved", MessageBoxIcon.Information);
+            NavigateToHome(); // lặp thông báo
+        }
+
+
+        // ... các phương thức khác của MainController ...
+        #region Event Handlers from KeyMappingService
+        private void OnKeyMappingServiceNotificationRequested(object? sender, NotificationEventArgs e)
+        {
+            if (e?.Info != null)
+            {
+                _view.ShowUserNotification(e.Info.Message, e.Info.Title, ConvertToMessageBoxIcon(e.Info.Type));
+            }
+        }
+
+        private MessageBoxIcon ConvertToMessageBoxIcon(NotificationType notificationType)
+        {
+            switch (notificationType)
+            {
+                case NotificationType.Error: return MessageBoxIcon.Error;
+                case NotificationType.Warning: return MessageBoxIcon.Warning;
+                case NotificationType.Info:
+                case NotificationType.None:
+                default: return MessageBoxIcon.Information;
+            }
         }
         #endregion
 
         #region Event Handlers from View
-
-        // Called when the MainView (MainForm) raises its ViewLoaded event
-        private void OnViewLoaded(object? sender, EventArgs e) // Sửa: object? sender
+        private void OnViewLoaded(object? sender, EventArgs e)
         {
             try
             {
                 Debug.WriteLine("[INFO] MainController: ViewLoaded event received. Initializing...");
+                _currentAppSettings = _appSettingsService.LoadSettings();
                 _keyMappingService.LoadRules();
                 LoadRulesIntoView();
 
-                AppSettings settings = _appSettingsService.LoadSettings(); // LoadSettings đảm bảo non-null
-                _view.IsServiceEnabledUI = settings.IsGlobalHookEnabled;
-
-                if (settings.IsGlobalHookEnabled)
+                _view.IsServiceEnabledUI = _currentAppSettings.IsGlobalHookEnabled;
+                if (_currentAppSettings.IsGlobalHookEnabled)
                 {
                     _keyMappingService.EnableService();
                 }
-                // else, service is already disabled or will be by default.
+                NavigateToHome();
             }
             catch (Exception ex)
             {
@@ -75,7 +133,7 @@ namespace QuickFnMapper.WinForms.Controllers
             }
         }
 
-        private void OnToggleServiceStatusClicked(object? sender, EventArgs e) // Sửa: object? sender
+        private void OnToggleServiceStatusClicked(object? sender, EventArgs e)
         {
             try
             {
@@ -91,30 +149,31 @@ namespace QuickFnMapper.WinForms.Controllers
                     newServiceState = true;
                 }
                 _view.IsServiceEnabledUI = newServiceState;
-
-                AppSettings settings = _appSettingsService.LoadSettings();
-                settings.IsGlobalHookEnabled = newServiceState;
-                _appSettingsService.SaveSettings(settings);
+                _currentAppSettings.IsGlobalHookEnabled = newServiceState;
+                _appSettingsService.SaveSettings(_currentAppSettings);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[ERROR] MainController: Error toggling service. {ex.Message}");
                 _view.ShowUserNotification($"Error toggling service: {ex.Message}", "Service Error", MessageBoxIcon.Error);
-                _view.IsServiceEnabledUI = _keyMappingService.IsServiceEnabled; // Đồng bộ lại UI với trạng thái thực tế
+                if (_keyMappingService != null)
+                {
+                    _view.IsServiceEnabledUI = _keyMappingService.IsServiceEnabled;
+                }
             }
         }
 
-        private void OnAddRuleClicked(object? sender, EventArgs e) // Sửa: object? sender
+        private void OnAddRuleClicked(object? sender, EventArgs e)
         {
-            _view.ShowRuleEditor(null); // Truyền null để báo hiệu là thêm mới
+            _view.ShowRuleEditor(null);
         }
 
-        private void OnEditRuleClicked(object? sender, EventArgs e) // Sửa: object? sender
+        private void OnEditRuleClicked(object? sender, EventArgs e)
         {
-            Guid? selectedRuleId = _view.SelectedRuleId; // SelectedRuleId là Guid?
+            Guid? selectedRuleId = _view.SelectedRuleId;
             if (selectedRuleId.HasValue)
             {
-                KeyMappingRule? ruleToEdit = _keyMappingService.GetRuleById(selectedRuleId.Value); // GetRuleById trả về KeyMappingRule?
+                KeyMappingRule? ruleToEdit = _keyMappingService.GetRuleById(selectedRuleId.Value);
                 if (ruleToEdit != null)
                 {
                     _view.ShowRuleEditor(ruleToEdit);
@@ -122,7 +181,7 @@ namespace QuickFnMapper.WinForms.Controllers
                 else
                 {
                     _view.ShowUserNotification("The selected rule could not be found (it may have been deleted).", "Rule Not Found", MessageBoxIcon.Warning);
-                    LoadRulesIntoView(); // Làm mới danh sách
+                    LoadRulesIntoView();
                 }
             }
             else
@@ -131,24 +190,17 @@ namespace QuickFnMapper.WinForms.Controllers
             }
         }
 
-        private void OnDeleteRuleClicked(object? sender, EventArgs e) // Sửa: object? sender
+        private void OnDeleteRuleClicked(object? sender, EventArgs e)
         {
             Guid? selectedRuleId = _view.SelectedRuleId;
             if (selectedRuleId.HasValue)
             {
-                // Đại ca có thể muốn thêm hộp thoại xác nhận ở đây, gọi từ View
-                // Ví dụ: if (_view.ShowConfirmation("Are you sure?")) { ... }
                 try
                 {
                     _keyMappingService.DeleteRule(selectedRuleId.Value);
                     LoadRulesIntoView();
                     _view.ClearRuleSelection();
                     _view.ShowUserNotification("Rule deleted successfully.", "Delete Rule", MessageBoxIcon.Information);
-                }
-                catch (InvalidOperationException ex)
-                {
-                    _view.ShowUserNotification(ex.Message, "Delete Error", MessageBoxIcon.Warning);
-                    LoadRulesIntoView();
                 }
                 catch (Exception ex)
                 {
@@ -162,116 +214,109 @@ namespace QuickFnMapper.WinForms.Controllers
             }
         }
 
-        private void OnOpenSettingsClicked(object? sender, EventArgs e) // Sửa: object? sender
+        private void OnOpenSettingsClicked(object? sender, EventArgs e)
         {
-            AppSettings currentSettings = _appSettingsService.LoadSettings(); // LoadSettings đảm bảo non-null
-            _view.ShowSettingsEditor(currentSettings);
-            // Logic cập nhật sau khi SettingsEditor đóng sẽ được xử lý bởi SettingsEditorSaved()
+            _currentAppSettings = _appSettingsService.LoadSettings();
+            _view.ShowSettingsEditor(_currentAppSettings);
         }
 
-        private void OnViewClosing(object? sender, CancelEventArgs e) // Sửa: object? sender
+        private void OnViewClosing(object? sender, CancelEventArgs e)
         {
-            // Ví dụ về xác nhận thoát, View sẽ cần implement một phương thức ShowConfirmation
-            // bool confirmExit = _view.ShowConfirmation("Exit QuickFn Mapper?", "Confirm Exit", MessageBoxIcon.Question);
-            // if (!confirmExit)
-            // {
-            //    e.Cancel = true; // Ngăn form đóng
-            //    return;
-            // }
-
-            try
+            if (!e.Cancel)
             {
-                Debug.WriteLine("[INFO] MainController: ViewClosing event received. Cleaning up...");
-                if (_keyMappingService.IsServiceEnabled)
+                try
                 {
-                    _keyMappingService.DisableService(); // Đảm bảo hook được dừng
+                    Debug.WriteLine("[INFO] MainController: View is actually closing. Performing final cleanup...");
+                    if (_keyMappingService.IsServiceEnabled)
+                    {
+                        _keyMappingService.DisableService();
+                    }
                 }
-                // Cân nhắc lưu AppSettings một lần cuối nếu có thay đổi nào đó chưa được lưu
-                // AppSettings settings = _appSettingsService.LoadSettings();
-                // if (settings.IsGlobalHookEnabled != _keyMappingService.IsServiceEnabled) // Ví dụ 1 kiểm tra
-                // {
-                //    settings.IsGlobalHookEnabled = _keyMappingService.IsServiceEnabled;
-                //    _appSettingsService.SaveSettings(settings);
-                // }
-            }
-            catch (Exception ex)
-            {
-                Debug.WriteLine($"[ERROR] MainController: Error during application cleanup on exit. {ex.Message}");
-                // Không nên ném lỗi ở đây để tránh ứng dụng không thoát được
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[ERROR] MainController: Error during application cleanup on exit. {ex.Message}");
+                }
             }
         }
-
         #endregion
 
-        #region Public Methods (called by other controllers or after dialogs close)
+        #region Methods called by MainForm (hoặc các Controller khác)
 
-        /// <summary>
-        /// <para>Reloads the rules from the service and updates the view.</para>
-        /// <para>Tải lại các quy tắc từ dịch vụ và cập nhật view.</para>
-        /// </summary>
-        public void RefreshRulesDisplay()
+        public void PrepareAndShowRuleEditor(KeyMappingRule? ruleToEdit, IRuleEditorView ruleEditorView)
         {
-            LoadRulesIntoView();
+            if (ruleEditorView == null)
+            {
+                Debug.WriteLine("[ERROR] MainController.PrepareAndShowRuleEditor: ruleEditorView is null.");
+                return;
+            }
+            // Tạo RuleEditorController nếu chưa có hoặc đã bị dispose
+            // if (_ruleEditorController == null || _ruleEditorController.IsDisposed) // Cần cơ chế quản lý instance controller con tốt hơn nếu chúng có state
+            // {
+            _ruleEditorController = new RuleEditorController(ruleEditorView, _keyMappingService, this);
+            // }
+            _ruleEditorController.PrepareForEditing(ruleToEdit);
         }
 
-        /// <summary>
-        /// <para>Called by the RuleEditor's controller after a rule has been successfully saved (added/updated).</para>
-        /// <para>Được gọi bởi controller của RuleEditor sau khi một quy tắc đã được lưu thành công (thêm/cập nhật).</para>
-        /// </summary>
-        /// <param name="rule">
-        /// <para>The rule that was saved. Expected to be non-null.</para>
-        /// <para>Quy tắc đã được lưu. Được mong đợi là không null.</para>
-        /// </param>
-        public void RuleEditorSaved(KeyMappingRule rule) // rule ở đây là non-null
+        public void PrepareAndShowSettingsEditor(AppSettings currentSettings, ISettingsView settingsView)
         {
-            // KeyMappingService đã tự động SaveRules() rồi.
-            // Chỉ cần làm mới danh sách trên UI.
+            if (settingsView == null)
+            {
+                Debug.WriteLine("[ERROR] MainController.PrepareAndShowSettingsEditor: settingsView is null.");
+                return;
+            }
+            //  if (_settingsController == null || _settingsController.IsDisposed)
+            // {
+            _settingsController = new SettingsController(settingsView, _appSettingsService, this);
+            // }
+            _settingsController.LoadAndDisplaySettingsOnView();
+        }
+
+        public void RuleEditorSaved(KeyMappingRule rule)
+        {
             LoadRulesIntoView();
             _view.ShowUserNotification($"Rule '{rule.Name}' saved successfully.", "Rule Saved", MessageBoxIcon.Information);
-            // Có thể chọn lại rule vừa được sửa/thêm trên UI nếu cần
+            NavigateToRuleManagement(null);
         }
 
-        /// <summary>
-        /// <para>Called by the SettingsEditor's controller after settings have been successfully saved.</para>
-        /// <para>Được gọi bởi controller của SettingsEditor sau khi cài đặt đã được lưu thành công.</para>
-        /// </summary>
-        public void SettingsEditorSaved()
+        public void NavigateToHome()
         {
-            // AppSettingsService đã lưu rồi.
-            // Cập nhật lại trạng thái UI của MainView nếu cần thiết dựa trên settings mới.
-            AppSettings newSettings = _appSettingsService.LoadSettings(); // LoadSettings đảm bảo non-null
-
-            bool previousUiHookState = _view.IsServiceEnabledUI;
-            _view.IsServiceEnabledUI = newSettings.IsGlobalHookEnabled;
-
-            // Đồng bộ trạng thái của KeyMappingService với cài đặt mới
-            if (newSettings.IsGlobalHookEnabled && !previousUiHookState && !_keyMappingService.IsServiceEnabled)
-            {
-                _keyMappingService.EnableService();
-            }
-            else if (!newSettings.IsGlobalHookEnabled && previousUiHookState && _keyMappingService.IsServiceEnabled)
-            {
-                _keyMappingService.DisableService();
-            }
-            _view.ShowUserNotification("Settings applied successfully.", "Settings Saved", MessageBoxIcon.Information);
-            // Cập nhật các UI khác dựa trên settings nếu có
+            _view.ShowHomeControl();
         }
+
+        public void NavigateToRuleManagement(Control? listViewControl)
+        {
+            // MainForm sẽ xử lý việc hiển thị listViewRules khi phương thức này được gọi
+            if (_view is MainForm mainFormInstance)
+            {
+                mainFormInstance.ShowUserControlInPanel(listViewControl); // Truyền control cụ thể nếu cần
+            }
+            LoadRulesIntoView(); // Đảm bảo rules được cập nhật
+        }
+
+        // Được gọi từ MainForm khi HomeControl raise event
+        public void OnHomeManageRulesRequested()
+        {
+            // MainForm có thể có một control ListView cố định hoặc một UserControl riêng cho quản lý rule
+            // Ở đây, chúng ta chỉ cần yêu cầu MainForm hiển thị nó.
+            // MainForm sẽ tự biết control nào cần hiển thị.
+            if (_view is MainForm mainFormInstance)
+            {
+                // Giả sử listViewRules là một control có sẵn trên MainForm và được quản lý trong pnlMainContent
+                mainFormInstance.ShowUserControlInPanel(mainFormInstance.Controls.Find("listViewRules", true).FirstOrDefault());
+            }
+            LoadRulesIntoView(); // Hiển thị danh sách rules
+        }
+
         #endregion
 
         #region Private Helper Methods
-
-        /// <summary>
-        /// <para>Loads rules from the KeyMappingService and tells the view to display them.</para>
-        /// <para>Tải quy tắc từ KeyMappingService và yêu cầu view hiển thị chúng.</para>
-        /// </summary>
         private void LoadRulesIntoView()
         {
             try
             {
-                // GetAllRules() trả về IEnumerable<KeyMappingRule> (non-null)
                 IEnumerable<KeyMappingRule> rules = _keyMappingService.GetAllRules()
-                                                                  .OrderBy(r => r.Order)
-                                                                  .ThenBy(r => r.Name ?? string.Empty); // Xử lý Name có thể null
+                                                                    .OrderBy(r => r.Order)
+                                                                    .ThenBy(r => r.Name ?? string.Empty);
                 _view.DisplayRules(rules);
             }
             catch (Exception ex)

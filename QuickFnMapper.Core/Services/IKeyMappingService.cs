@@ -1,7 +1,8 @@
 ﻿#region Using Directives
 using System;
 using System.Collections.Generic;
-using QuickFnMapper.Core.Models; // Để sử dụng KeyMappingRule
+using QuickFnMapper.Core.Models;
+// Không cần using QuickFnMapper.Core.Services; ở đây nếu NotificationEventArgs cùng namespace (đã là Core.Services)
 #endregion
 
 namespace QuickFnMapper.Core.Services
@@ -10,7 +11,7 @@ namespace QuickFnMapper.Core.Services
     /// <para>Defines the contract for a service that manages key mapping rules.</para>
     /// <para>Định nghĩa hợp đồng cho một dịch vụ quản lý các quy tắc ánh xạ phím.</para>
     /// </summary>
-    public interface IKeyMappingService // Cân nhắc implement IDisposable nếu service này cần giải phóng tài nguyên trực tiếp (hiện tại nó phụ thuộc IGlobalHookService đã IDisposable)
+    public interface IKeyMappingService
     {
         /// <summary>
         /// <para>Gets a value indicating whether the key mapping service is currently enabled and processing key events.</para>
@@ -33,8 +34,6 @@ namespace QuickFnMapper.Core.Services
         /// <summary>
         /// <para>Loads all key mapping rules from persistent storage.</para>
         /// <para>Tải tất cả các quy tắc ánh xạ phím từ bộ lưu trữ bền vững.</para>
-        /// <para>This should be called, for example, at application startup or when settings indicate a change in rules file path.</para>
-        /// <para>Phương thức này nên được gọi, ví dụ, khi ứng dụng khởi động hoặc khi cài đặt chỉ ra sự thay đổi đường dẫn tệp quy tắc.</para>
         /// </summary>
         void LoadRules();
 
@@ -58,70 +57,35 @@ namespace QuickFnMapper.Core.Services
         /// <para>Gets a specific key mapping rule by its unique identifier.</para>
         /// <para>Lấy một quy tắc ánh xạ phím cụ thể bằng mã định danh duy nhất của nó.</para>
         /// </summary>
-        /// <param name="id">
-        /// <para>The unique identifier of the rule.</para>
-        /// <para>Mã định danh duy nhất của quy tắc.</para>
-        /// </param>
-        /// <returns>
-        /// <para>The <see cref="KeyMappingRule"/> if found; otherwise, <c>null</c>.</para>
-        /// <para><see cref="KeyMappingRule"/> nếu tìm thấy; ngược lại, <c>null</c>.</para>
-        /// </returns>
-        KeyMappingRule? GetRuleById(Guid id); // Sửa: Kiểu trả về là nullable 'KeyMappingRule?'
+        /// <param name="id">The unique identifier of the rule.</param>
+        /// <returns>The <see cref="KeyMappingRule"/> if found; otherwise, <c>null</c>.</returns>
+        KeyMappingRule? GetRuleById(Guid id);
 
         /// <summary>
         /// <para>Adds a new key mapping rule to the collection.</para>
         /// <para>Thêm một quy tắc ánh xạ phím mới vào bộ sưu tập.</para>
-        /// <para>Implementations should typically call <see cref="SaveRules"/> afterwards or provide a mechanism for batch saving.</para>
-        /// <para>Các lớp triển khai thường nên gọi <see cref="SaveRules"/> sau đó hoặc cung cấp một cơ chế để lưu hàng loạt.</para>
         /// </summary>
-        /// <param name="rule">
-        /// <para>The <see cref="KeyMappingRule"/> to add. This parameter is expected to be non-null.</para>
-        /// <para>Quy tắc <see cref="KeyMappingRule"/> cần thêm. Tham số này được mong đợi là không null.</para>
-        /// </param>
-        /// <exception cref="ArgumentNullException">
-        /// <para>Thrown by implementations if <paramref name="rule"/> is null.</para>
-        /// <para>Có thể được ném bởi các lớp triển khai nếu <paramref name="rule"/> là null.</para>
-        /// </exception>
-        /// <exception cref="InvalidOperationException">
-        /// <para>Thrown by implementations if a rule with the same ID already exists.</para>
-        /// <para>Có thể được ném bởi các lớp triển khai nếu một quy tắc với cùng ID đã tồn tại.</para>
-        /// </exception>
+        /// <param name="rule">The <see cref="KeyMappingRule"/> to add. Expected to be non-null.</param>
         void AddRule(KeyMappingRule rule);
 
         /// <summary>
         /// <para>Updates an existing key mapping rule in the collection.</para>
         /// <para>Cập nhật một quy tắc ánh xạ phím hiện có trong bộ sưu tập.</para>
-        /// <para>Implementations should typically call <see cref="SaveRules"/> afterwards.</para>
-        /// <para>Các lớp triển khai thường nên gọi <see cref="SaveRules"/> sau đó.</para>
         /// </summary>
-        /// <param name="rule">
-        /// <para>The <see cref="KeyMappingRule"/> to update, identified by its Id. This parameter is expected to be non-null.</para>
-        /// <para>Quy tắc <see cref="KeyMappingRule"/> cần cập nhật, được xác định bằng Id của nó. Tham số này được mong đợi là không null.</para>
-        /// </param>
-        /// <exception cref="ArgumentNullException">
-        /// <para>Thrown by implementations if <paramref name="rule"/> is null.</para>
-        /// <para>Có thể được ném bởi các lớp triển khai nếu <paramref name="rule"/> là null.</para>
-        /// </exception>
-        /// <exception cref="InvalidOperationException">
-        /// <para>Thrown by implementations if the rule to update is not found.</para>
-        /// <para>Có thể được ném bởi các lớp triển khai nếu quy tắc cần cập nhật không được tìm thấy.</para>
-        /// </exception>
+        /// <param name="rule">The <see cref="KeyMappingRule"/> to update. Expected to be non-null.</param>
         void UpdateRule(KeyMappingRule rule);
 
         /// <summary>
         /// <para>Deletes a key mapping rule from the collection by its unique identifier.</para>
         /// <para>Xóa một quy tắc ánh xạ phím khỏi bộ sưu tập bằng mã định danh duy nhất của nó.</para>
-        /// <para>Implementations should typically call <see cref="SaveRules"/> afterwards.</para>
-        /// <para>Các lớp triển khai thường nên gọi <see cref="SaveRules"/> sau đó.</para>
         /// </summary>
-        /// <param name="id">
-        /// <para>The unique identifier of the rule to delete.</para>
-        /// <para>Mã định danh duy nhất của quy tắc cần xóa.</para>
-        /// </param>
-        /// <exception cref="InvalidOperationException">
-        /// <para>Thrown by implementations if the rule to delete is not found.</para>
-        /// <para>Có thể được ném bởi các lớp triển khai nếu quy tắc cần xóa không được tìm thấy.</para>
-        /// </exception>
+        /// <param name="id">The unique identifier of the rule to delete.</param>
         void DeleteRule(Guid id);
+
+        /// <summary>
+        /// Occurs when the service needs to display a notification to the user
+        /// (e.g., after a rule is executed or an error occurs during execution).
+        /// </summary>
+        event EventHandler<NotificationEventArgs>? NotificationRequested;
     }
 }

@@ -1,5 +1,5 @@
 ﻿#region Using Directives
-using QuickFnMapper.Core.Models;
+using QuickFnMapper.Core.Models; // Đại ca đã có OriginalKeyData, ActionType ở đây [cite: 1035]
 using QuickFnMapper.WinForms.Views.Interfaces;
 using System;
 using System.Collections.Generic;
@@ -10,190 +10,329 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using System.Diagnostics;
+using QuickFnMapper.WinForms.Utils;   // Cho UIMessageHelper (nếu dùng) và Program.AppThemeManager [cite: 1036]
+using QuickFnMapper.WinForms.Themes; // Cho ColorPalette [cite: 1036]
 #endregion
 
 namespace QuickFnMapper.WinForms.Views
 {
-    // Quan trọng: Đảm bảo là 'partial class'
     public partial class RuleEditorControl : UserControl, IRuleEditorView
     {
+        private bool _isCapturingKey = false;
+        private OriginalKeyData _capturedKeyData = new OriginalKeyData(Keys.None); // [cite: 1037]
+        private OriginalKeyData _selectedOriginalKeyField = new OriginalKeyData(Keys.None); // [cite: 1038]
+
+        // Event này có thể được Controller sử dụng để biết key đã thay đổi mà không cần phải get SelectedOriginalKey liên tục.
+        // Hoặc nếu Controller không cần, có thể bỏ đi.
+        public event EventHandler<OriginalKeyData>? UserSelectedOriginalKeyChanged;
+
         public RuleEditorControl()
         {
-            InitializeComponent(); // Gọi phương thức từ file .Designer.cs
+            InitializeComponent(); // [cite: 1039]
+            this.Load += RuleEditorControl_Load; // [cite: 1039]
 
-            // Đăng ký các sự kiện từ control UI để kích hoạt event của Interface
-            // Đại ca sẽ tạo các control này trong Designer
-            // Giả sử các control đã được tạo:
-            if (this.btnSaveRule != null) // btnSaveRule là Button "Lưu"
-                this.btnSaveRule.Click += (s, e) => SaveRuleClicked?.Invoke(this, EventArgs.Empty);
-
-            if (this.btnCancelRule != null) // btnCancelRule là Button "Hủy"
-                this.btnCancelRule.Click += (s, e) => CancelClicked?.Invoke(this, EventArgs.Empty);
-
-            if (this.cmbActionType != null) // cmbActionType là ComboBox chọn ActionType
-                this.cmbActionType.SelectedIndexChanged += CmbActionType_SelectedIndexChanged;
-
-            this.Load += RuleEditorControl_Load;
-        }
-
-        private void RuleEditorControl_Load(object? sender, EventArgs e)
-        {
-            ViewInitialized?.Invoke(this, EventArgs.Empty);
-        }
-
-        private void CmbActionType_SelectedIndexChanged(object? sender, EventArgs e)
-        {
-            if (cmbActionType.SelectedItem is ActionType selectedType)
+            // Đăng ký và áp dụng theme
+            if (Program.AppThemeManager != null)
             {
-                SelectedActionTypeChanged?.Invoke(this, selectedType);
+                Program.AppThemeManager.ThemeChanged += OnAppThemeChanged; // [cite: 1040]
+                Program.AppThemeManager.ApplyThemeToFormOrUserControl(this); // Áp dụng theme ban đầu [cite: 1040]
+            }
+            this.Disposed += RuleEditorControl_Disposed; // Đăng ký sự kiện Disposed [cite: 1041]
+        }
+
+        #region Theme Handling
+        private void OnAppThemeChanged(object? sender, EventArgs e) // Đại ca đã có EventArgs, không phải ThemeChangedEventArgs
+        {
+            if (Program.AppThemeManager != null)
+            {
+                Program.AppThemeManager.ApplyThemeToFormOrUserControl(this); // [cite: 1042]
+            }
+            // Thêm logic cập nhật màu nền cho txtOriginalKeyDisplay dựa trên theme và trạng thái capture
+            UpdateOriginalKeyDisplayAppearance();
+        }
+
+        private void RuleEditorControl_Disposed(object? sender, EventArgs e)
+        {
+            // Hủy đăng ký sự kiện ThemeChanged
+            if (Program.AppThemeManager != null)
+            {
+                Program.AppThemeManager.ThemeChanged -= OnAppThemeChanged; // [cite: 1043]
+                Debug.WriteLine("[INFO] RuleEditorControl_Disposed: Unsubscribed from AppThemeManager.ThemeChanged."); // [cite: 1043]
+            }
+        }
+        #endregion
+
+        #region Key Capture Logic
+
+        private void UpdateOriginalKeyDisplayAppearance()
+        {
+            if (txtOriginalKeyDisplay == null || Program.AppThemeManager == null) return;
+
+            if (_isCapturingKey)
+            {
+                // Màu khi đang capture (có thể làm khác biệt hơn)
+                // Ví dụ: dùng một màu vàng nhạt hoặc một màu từ palette nếu có
+                txtOriginalKeyDisplay.BackColor = ControlPaint.Light(Program.AppThemeManager.CurrentPalette.ControlBackground, 0.3f); // Sáng hơn một chút
+            }
+            else
+            {
+                txtOriginalKeyDisplay.BackColor = Program.AppThemeManager.CurrentPalette.ControlBackground;
             }
         }
 
-        #region IRuleEditorView Implementation
+        private void btnCaptureKey_Click(object? sender, EventArgs e)
+        {
+            _isCapturingKey = true; // [cite: 1045]
+            _capturedKeyData = new OriginalKeyData(Keys.None); // Reset lại key đang capture
+            if (txtOriginalKeyDisplay != null)
+            {
+                txtOriginalKeyDisplay.Text = "Press any key combination..."; // [cite: 1046]
+                UpdateOriginalKeyDisplayAppearance(); // Cập nhật màu nền
+                txtOriginalKeyDisplay.Focus(); // [cite: 1046]
+            }
+            CaptureOriginalKeyRequested?.Invoke(this, EventArgs.Empty); // [cite: 1092] Event này vẫn có thể giữ lại nếu Controller cần biết
+        }
 
+        private void txtOriginalKeyDisplay_Enter(object? sender, EventArgs e)
+        {
+            // Không làm gì khi focus bằng Tab, chỉ thay đổi khi nhấn nút "Capture Key"
+        }
+
+        private void txtOriginalKeyDisplay_Leave(object? sender, EventArgs e)
+        {
+            if (_isCapturingKey) // Nếu người dùng click ra ngoài mà chưa chọn xong key
+            {
+                _isCapturingKey = false; // Dừng capture [cite: 1049]
+                // Hiển thị key đã chọn trước đó (nếu có) hoặc "None"
+                if (txtOriginalKeyDisplay != null)
+                {
+                    txtOriginalKeyDisplay.Text = _selectedOriginalKeyField?.ToString() ?? Keys.None.ToString(); // [cite: 1050]
+                    UpdateOriginalKeyDisplayAppearance(); // Reset màu nền
+                }
+                Debug.WriteLine("[INFO] RuleEditorControl: Key capture stopped due to focus leave.");
+            }
+        }
+
+        private void txtOriginalKeyDisplay_KeyDown(object? sender, KeyEventArgs e)
+        {
+            if (_isCapturingKey)
+            {
+                e.SuppressKeyPress = true; // [cite: 1051]
+                e.Handled = true; // [cite: 1051]
+
+                // Kiểm tra xem chỉ có phím bổ trợ (modifier) được nhấn hay không
+                // Và không phải là chính phím bổ trợ đó đang được kiểm tra (e.Modifiers == e.KeyCode)
+                bool isOnlyModifierWithoutOtherKey = (e.KeyCode == Keys.ControlKey || e.KeyCode == Keys.ShiftKey || e.KeyCode == Keys.Menu || e.KeyCode == Keys.LWin || e.KeyCode == Keys.RWin);
+
+                if (isOnlyModifierWithoutOtherKey && e.Modifiers == e.KeyCode && !(e.Control && e.KeyCode != Keys.ControlKey) && !(e.Shift && e.KeyCode != Keys.ShiftKey) && !(e.Alt && e.KeyCode != Keys.Menu))
+                {
+                    // Nếu chỉ nhấn một phím modifier (Ctrl, Shift, Alt, Win) thì hiển thị nó và tiếp tục chờ
+                    _capturedKeyData = new OriginalKeyData(Keys.None, e.Control, e.Shift, e.Alt, (Control.ModifierKeys & Keys.LWin) == Keys.LWin || (Control.ModifierKeys & Keys.RWin) == Keys.RWin); // [cite: 1053]
+                    if (txtOriginalKeyDisplay != null)
+                    {
+                        string displayText = _capturedKeyData.ToString();
+                        if (displayText.EndsWith("None") && displayText != "None") // Ví dụ: "Ctrl + None"
+                        {
+                            displayText = displayText.Replace("None", "...") + " + ???";
+                        }
+                        else if (displayText == "None")
+                        {
+                            displayText = "Press a key...";
+                        }
+                        else
+                        {
+                            displayText += " + ???";
+                        }
+                        txtOriginalKeyDisplay.Text = displayText;
+                    }
+                    return; // Tiếp tục chờ phím chính
+                }
+
+                // Đã bắt được tổ hợp phím hoàn chỉnh (có phím chính)
+                _capturedKeyData = new OriginalKeyData(e.KeyCode, e.Control, e.Shift, e.Alt, (Control.ModifierKeys & Keys.LWin) == Keys.LWin || (Control.ModifierKeys & Keys.RWin) == Keys.RWin); // [cite: 1055]
+
+                _selectedOriginalKeyField = _capturedKeyData; // Gán vào field lưu trữ giá trị đã chọn
+                _isCapturingKey = false; // Kết thúc trạng thái capture *TRƯỚC KHI* cập nhật UI hoặc focus
+
+                // Cập nhật UI hiển thị key đã bắt
+                if (txtOriginalKeyDisplay != null)
+                {
+                    txtOriginalKeyDisplay.Text = _selectedOriginalKeyField.ToString();
+                    UpdateOriginalKeyDisplayAppearance(); // Reset màu nền
+                }
+
+                UserSelectedOriginalKeyChanged?.Invoke(this, _selectedOriginalKeyField); // Thông báo cho controller (nếu có đăng ký)
+
+                btnSaveRule?.Focus(); // Chuyển focus sang nút Save [cite: 1055]
+            }
+        }
+        #endregion
+
+        #region Event Handlers for Controller (Được đăng ký trong Designer.cs)
+        private void RuleEditorControl_Load(object? sender, EventArgs e)
+        {
+            // Program.AppThemeManager.ApplyThemeToFormOrUserControl(this) đã gọi trong constructor
+            // nhưng gọi lại ở đây để đảm bảo nếu có control con được thêm sau constructor.
+            if (Program.AppThemeManager != null) Program.AppThemeManager.ApplyThemeToFormOrUserControl(this);
+            ViewInitialized?.Invoke(this, EventArgs.Empty); // [cite: 1056]
+        }
+        private void cmbActionType_SelectedIndexChanged(object? sender, EventArgs e)
+        {
+            if (cmbActionType?.SelectedItem is ActionType selectedType)
+                SelectedActionTypeChanged?.Invoke(this, selectedType); // [cite: 1057]
+        }
+        private void btnSaveRule_Click(object? sender, EventArgs e) { SaveRuleClicked?.Invoke(this, EventArgs.Empty); } // [cite: 1058]
+        private void btnCancelRule_Click(object? sender, EventArgs e) { CancelClicked?.Invoke(this, EventArgs.Empty); } // [cite: 1059]
+        #endregion
+
+        #region IRuleEditorView Implementation
         public string RuleName
         {
-            get { return this.txtRuleName?.Text ?? string.Empty; } // Giả sử có TextBox tên là txtRuleName
-            set { if (this.txtRuleName != null) this.txtRuleName.Text = value; }
+            get => txtRuleName?.Text ?? string.Empty; // [cite: 1060]
+            set { if (txtRuleName != null) txtRuleName.Text = value; } // [cite: 1061]
         }
-
         public bool IsRuleEnabled
         {
-            get { return this.chkRuleEnabled?.Checked ?? false; } // Giả sử có CheckBox tên là chkRuleEnabled
-            set { if (this.chkRuleEnabled != null) this.chkRuleEnabled.Checked = value; }
+            get => chkRuleEnabled?.Checked ?? false; // [cite: 1062]
+            set { if (chkRuleEnabled != null) chkRuleEnabled.Checked = value; } // [cite: 1062]
         }
-
-        private OriginalKeyData _selectedOriginalKey = new OriginalKeyData(Keys.None);
         public OriginalKeyData SelectedOriginalKey
         {
-            get { return _selectedOriginalKey; }
+            get => _selectedOriginalKeyField; // [cite: 1063]
             set
             {
-                _selectedOriginalKey = value ?? new OriginalKeyData(Keys.None);
-                // Cập nhật UI hiển thị phím này (ví dụ: một TextBox hiển thị tên phím)
-                if (this.txtOriginalKeyDisplay != null) // Giả sử có TextBox txtOriginalKeyDisplay
+                _selectedOriginalKeyField = value ?? new OriginalKeyData(Keys.None); // [cite: 1064]
+                if (txtOriginalKeyDisplay != null && !_isCapturingKey) // Chỉ cập nhật nếu không phải đang trong quá trình capture từ KeyDown [cite: 1064]
                 {
-                    this.txtOriginalKeyDisplay.Text = _selectedOriginalKey.ToString();
+                    txtOriginalKeyDisplay.Text = _selectedOriginalKeyField.ToString(); // [cite: 1064]
                 }
             }
         }
-
         public ActionType SelectedActionType
         {
-            get { return this.cmbActionType?.SelectedItem is ActionType type ? type : ActionType.None; }
-            set { if (this.cmbActionType != null) this.cmbActionType.SelectedItem = value; }
+            get
+            {
+                if (cmbActionType?.SelectedItem is ActionType type) return type; // [cite: 1065]
+                return ActionType.None; // [cite: 1065] (Hoặc giá trị mặc định an toàn khác)
+            }
+            set
+            {
+                if (cmbActionType != null) cmbActionType.SelectedItem = value; // [cite: 1066]
+            }
         }
-
         public string ActionParameterValue
         {
-            get { return this.txtActionParameter?.Text ?? string.Empty; }
-            set { if (this.txtActionParameter != null) this.txtActionParameter.Text = value; }
+            get => txtActionParameter?.Text ?? string.Empty; // [cite: 1067]
+            set { if (txtActionParameter != null) txtActionParameter.Text = value; } // [cite: 1067]
         }
-
         public string? ActionParameterSecondaryValue
         {
-            get { return this.txtActionParameterSecondary?.Text; }
-            set { if (this.txtActionParameterSecondary != null) this.txtActionParameterSecondary.Text = value; }
+            get => txtActionParameterSecondary?.Text; // [cite: 1068]
+            set { if (txtActionParameterSecondary != null) txtActionParameterSecondary.Text = value; } // [cite: 1069]
         }
-
         public int RuleOrder
         {
-            get { return (int)(this.numOrder?.Value ?? 0); } // Giả sử có NumericUpDown tên là numOrder
-            set { if (this.numOrder != null) this.numOrder.Value = Math.Max(this.numOrder.Minimum, Math.Min(this.numOrder.Maximum, value)); }
+            get => (int)(numOrder?.Value ?? 0); // [cite: 1070]
+            set { if (numOrder != null) numOrder.Value = Math.Max(numOrder.Minimum, Math.Min(numOrder.Maximum, value)); } // [cite: 1071]
         }
 
         public void PopulateActionTypes(IEnumerable<ActionType> actionTypes)
         {
             if (this.cmbActionType != null)
             {
-                this.cmbActionType.DataSource = actionTypes.ToList();
-            }
-        }
-
-        public void PopulateMediaKeyParameters(IEnumerable<string> mediaKeyNames)
-        {
-            // Nếu ActionParameterValue là một ComboBox cho media keys
-            // if (this.cmbMediaKeyParam != null)
-            // {
-            //     this.cmbMediaKeyParam.DataSource = mediaKeyNames.ToList();
-            //     this.cmbMediaKeyParam.Visible = true;
-            //     this.txtActionParameter.Visible = false; 
-            // }
-        }
-
-        public void ConfigureActionParameterControls(ActionType actionType)
-        {
-            // Ví dụ:
-            if (this.txtActionParameter != null && this.lblActionParameterPrompt != null)
-            {
-                bool isVisible = (actionType == ActionType.RunApplication ||
-                                  actionType == ActionType.OpenUrl ||
-                                  actionType == ActionType.SendText ||
-                                  actionType == ActionType.SendMediaKey);
-                this.txtActionParameter.Visible = isVisible;
-                this.lblActionParameterPrompt.Visible = isVisible; // Giả sử có một Label lblActionParameterPrompt
-
-                if (isVisible)
+                object? cur = this.cmbActionType.SelectedItem; // [cite: 1072]
+                this.cmbActionType.DataSource = null; // [cite: 1072]
+                this.cmbActionType.DataSource = actionTypes.ToList(); // [cite: 1072]
+                if (cur != null && this.cmbActionType.Items.Contains(cur)) // [cite: 1073]
                 {
-                    switch (actionType)
-                    {
-                        case ActionType.RunApplication: this.lblActionParameterPrompt.Text = "Application Path:"; break;
-                        case ActionType.OpenUrl: this.lblActionParameterPrompt.Text = "URL:"; break;
-                        case ActionType.SendMediaKey: this.lblActionParameterPrompt.Text = "Media Key Name (e.g., VolumeUp):"; break;
-                        case ActionType.SendText: this.lblActionParameterPrompt.Text = "Text to Send:"; break;
-                    }
+                    this.cmbActionType.SelectedItem = cur; // [cite: 1073]
+                }
+                else if (this.cmbActionType.Items.Count > 0) // [cite: 1073]
+                {
+                    this.cmbActionType.SelectedIndex = 0; // [cite: 1073]
                 }
             }
-            if (this.txtActionParameterSecondary != null && this.lblActionParameterSecondaryPrompt != null)
+        }
+        public void PopulateMediaKeyParameters(IEnumerable<string> mediaKeyNames)
+        {
+            if (txtActionParameter != null && lblActionParameterPrompt != null)
             {
-                // Hiện tại chưa có ActionType nào dùng tham số phụ, ví dụ:
-                this.txtActionParameterSecondary.Visible = false;
-                this.lblActionParameterSecondaryPrompt.Visible = false;
+                var tt = new ToolTip(); // [cite: 1074]
+                tt.SetToolTip(txtActionParameter, "Examples: VolumeUp, PlayPause, Mute, or VK code (e.g., 0xAE for VolumeDown).\nAvailable: " + string.Join(", ", mediaKeyNames)); // [cite: 1075]
             }
         }
+        public void ConfigureActionParameterControls(ActionType actionType)
+        {
+            if (lblActionParameterPrompt == null || txtActionParameter == null || lblActionParameterSecondaryPrompt == null || txtActionParameterSecondary == null) return; // [cite: 1076]
+            bool pVis = false; string pPrm = "Parameter:"; bool sVis = false; string sPrm = "Sec. Parameter:"; // [cite: 1077]
 
+            // Giữ lại giá trị nếu người dùng đã nhập và chỉ thay đổi ActionType qua lại
+            // string currentParam1 = txtActionParameter.Text;
+            // string currentParam2 = txtActionParameterSecondary.Text;
+
+            // Reset text nếu ActionType thực sự thay đổi sang một loại khác yêu cầu input khác
+            // if (actionType != (cmbActionType.Tag as ActionType?)) // Giả sử lưu ActionType trước đó vào Tag
+            // {
+            //     txtActionParameter.Text = string.Empty;
+            //     txtActionParameterSecondary.Text = string.Empty;
+            // }
+            // cmbActionType.Tag = actionType; // Lưu lại action type hiện tại
+
+            switch (actionType)
+            {
+                case ActionType.SendMediaKey: pVis = true; pPrm = "Media Key Name/Code:"; break; // [cite: 1078]
+                case ActionType.RunApplication: pVis = true; pPrm = "Application Path:"; sVis = true; sPrm = "Arguments (Optional):"; break; // [cite: 1079] // Thêm sVis và sPrm
+                case ActionType.OpenUrl: pVis = true; pPrm = "URL / Path:"; break; // [cite: 1079]
+                case ActionType.SendText: pVis = true; pPrm = "Text to Send:"; break; // [cite: 1080]
+                case ActionType.TriggerHotkeyOrCommand: pVis = true; pPrm = "Hotkey/Command String:"; sVis = true; sPrm = "Type (Hotkey/Command):"; break; // [cite: 1081]
+                case ActionType.SetScreenBrightness:
+                    pVis = true; // [cite: 1082]
+                    pPrm = "Brightness (+/-Value or Absolute Value 0-100):"; // Mô tả cho người dùng [cite: 1082]
+                    sVis = false; // [cite: 1084]
+                    break; // [cite: 1085]
+                case ActionType.None: // [cite: 1086]
+                default:
+                    // pVis, sVis giữ nguyên là false (đã reset ở trên)
+                    pPrm = "Parameter:"; // Reset về mặc định
+                    break; // [cite: 1086]
+            }
+            lblActionParameterPrompt.Text = pPrm;
+            txtActionParameter.Visible = pVis;
+            lblActionParameterPrompt.Visible = pVis;
+            lblActionParameterSecondaryPrompt.Text = sPrm;
+            txtActionParameterSecondary.Visible = sVis;
+            lblActionParameterSecondaryPrompt.Visible = sVis; // [cite: 1087]
+        }
         public void ShowErrorMessage(string message, string caption)
         {
-            MessageBox.Show(this, message, caption, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            // Sử dụng UIMessageHelper nếu đã có và muốn chuẩn hóa
+            // UIMessageHelper.ShowError(message, caption, this.FindForm());
+            MessageBox.Show(this, message, caption, MessageBoxButtons.OK, MessageBoxIcon.Error); // [cite: 1088]
         }
-
         public void CloseView(bool success)
         {
-            var parentForm = this.FindForm();
-            if (parentForm != null)
+            var pForm = this.FindForm(); // [cite: 1089]
+            if (pForm != null)
             {
-                if (!(parentForm is MainForm))
+                if (!(pForm is MainForm mainFrm)) // [cite: 1090]
                 {
-                    // Nếu là dialog, có thể set DialogResult
-                    // parentForm.DialogResult = success ? DialogResult.OK : DialogResult.Cancel;
-                    parentForm.Close();
+                    pForm.DialogResult = success ? DialogResult.OK : DialogResult.Cancel; // [cite: 1090]
+                    pForm.Close(); // [cite: 1090]
                 }
                 else
                 {
-                    this.Visible = false;
-                    // MainController sẽ gọi RefreshRulesDisplay trên MainForm
+                    this.Visible = false; // [cite: 1090]
+                    mainFrm.ShowHomeControl(); // [cite: 1090] // Quay về HomeControl khi đóng
                 }
             }
         }
 
-        public event EventHandler? ViewInitialized;
-        public event EventHandler? SaveRuleClicked;
-        public event EventHandler? CancelClicked;
-        public event EventHandler<ActionType>? SelectedActionTypeChanged;
+        public event EventHandler? ViewInitialized; // [cite: 1091]
+        public event EventHandler? SaveRuleClicked; // [cite: 1091]
+        public event EventHandler? CancelClicked; // [cite: 1091]
+        public event EventHandler<ActionType>? SelectedActionTypeChanged; // [cite: 1091]
+        public event EventHandler? CaptureOriginalKeyRequested; // Event này vẫn có thể giữ lại nếu Controller cần biết [cite: 1092]
         #endregion
-
-        // Các control cần được Đại ca tạo trong Designer:
-        // private System.Windows.Forms.TextBox txtRuleName;
-        // private System.Windows.Forms.CheckBox chkRuleEnabled;
-        // private System.Windows.Forms.TextBox txtOriginalKeyDisplay; (Để hiển thị phím đã chọn)
-        // private System.Windows.Forms.Button btnCaptureKey; (Nút để bắt đầu quá trình chọn phím)
-        // private System.Windows.Forms.ComboBox cmbActionType;
-        // private System.Windows.Forms.Label lblActionParameterPrompt;
-        // private System.Windows.Forms.TextBox txtActionParameter;
-        // private System.Windows.Forms.Label lblActionParameterSecondaryPrompt;
-        // private System.Windows.Forms.TextBox txtActionParameterSecondary;
-        // private System.Windows.Forms.NumericUpDown numOrder;
-        // private System.Windows.Forms.Button btnSaveRule;
-        // private System.Windows.Forms.Button btnCancelRule;
     }
 }
