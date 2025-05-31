@@ -69,6 +69,8 @@ namespace QuickFnMapper.WinForms.Views.Interfaces
         /// Shows the home control/view.
         /// </summary>
         void ShowHomeControl(); // Giữ lại phương thức này để MainController có thể gọi nếu cần
+
+        void ShowRuleListView();
         #endregion
 
         #region Events triggered by UI actions

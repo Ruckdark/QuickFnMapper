@@ -89,10 +89,27 @@ namespace QuickFnMapper.Core.Services
         public void EnableService() { if (_isServiceCurrentlyEnabled) return; try { _globalHookService.KeyDownEvent += OnGlobalKeyDown; _globalHookService.StartHook(); _isServiceCurrentlyEnabled = true; Debug.WriteLineIf(_isServiceCurrentlyEnabled, "[INFO] KeyMappingService: Enabled."); } catch (Exception ex) { Debug.WriteLine($"[ERROR] KS: Enable failed. {ex.Message}"); DisableService(); } }
         public void DisableService() { if (!_isServiceCurrentlyEnabled && !_globalHookService.IsHookRunning) return; try { _globalHookService.StopHook(); _globalHookService.KeyDownEvent -= OnGlobalKeyDown; _isServiceCurrentlyEnabled = false; Debug.WriteLineIf(!_isServiceCurrentlyEnabled, "[INFO] KeyMappingService: Disabled."); } catch (Exception ex) { Debug.WriteLine($"[ERROR] KS: Disable failed. {ex.Message}"); } }
         public void LoadRules() { try { if (File.Exists(_rulesFilePath)) { string json = File.ReadAllText(_rulesFilePath); if (!string.IsNullOrWhiteSpace(json)) { _rules = JsonSerializer.Deserialize<List<KeyMappingRule>>(json, _jsonSerializerOptions) ?? new List<KeyMappingRule>(); Debug.WriteLine($"[INFO] KS: Loaded {_rules.Count} rules from '{_rulesFilePath}'."); return; } else Debug.WriteLine($"[INFO] KS: Rules file '{_rulesFilePath}' empty."); } else Debug.WriteLine($"[INFO] KS: Rules file '{_rulesFilePath}' not found."); } catch (Exception ex) { Debug.WriteLine($"[ERROR] KS: Load rules error. {ex.Message}."); } _rules = new List<KeyMappingRule>(); }
-        public void SaveRules() { try { string? dir = Path.GetDirectoryName(_rulesFilePath); if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir); string json = JsonSerializer.Serialize(_rules, _jsonSerializerOptions); File.WriteAllText(_rulesFilePath, json); Debug.WriteLine($"[INFO] KS: Saved {_rules.Count} rules to '{_rulesFilePath}'."); } catch (Exception ex) { Debug.WriteLine($"[ERROR] KS: Save rules error. {ex.Message}"); } }
+        public void SaveRules() 
+        {
+            Debug.WriteLine($"[DEBUG] SaveRules called. StackTrace: {new StackTrace(true).ToString()}");
+            try 
+            { string? dir = Path.GetDirectoryName(_rulesFilePath); 
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) 
+                    Directory.CreateDirectory(dir); 
+                string json = JsonSerializer.Serialize(_rules, _jsonSerializerOptions); 
+                File.WriteAllText(_rulesFilePath, json); 
+                Debug.WriteLine($"[INFO] KS: Saved {_rules.Count} rules to '{_rulesFilePath}'."); 
+            } 
+            catch (Exception ex) { Debug.WriteLine($"[ERROR] KS: Save rules error. {ex.Message}"); } }
         public IEnumerable<KeyMappingRule> GetAllRules() => _rules.ToList();
         public KeyMappingRule? GetRuleById(Guid id) => _rules.FirstOrDefault(r => r.Id == id);
-        public void AddRule(KeyMappingRule rule) { if (rule == null) throw new ArgumentNullException(nameof(rule)); if (_rules.Any(r => r.Id == rule.Id)) throw new InvalidOperationException($"Rule ID {rule.Id} exists."); _rules.Add(rule); SaveRules(); }
+        public void AddRule(KeyMappingRule rule) 
+        { 
+            if (rule == null) 
+                throw new ArgumentNullException(nameof(rule)); 
+            if (_rules.Any(r => r.Id == rule.Id)) 
+                throw new InvalidOperationException($"Rule ID {rule.Id} exists."); _rules.Add(rule); SaveRules(); 
+        }
         public void UpdateRule(KeyMappingRule rule) { if (rule == null) throw new ArgumentNullException(nameof(rule)); int i = _rules.FindIndex(r => r.Id == rule.Id); if (i == -1) throw new InvalidOperationException($"Rule ID {rule.Id} not found."); rule.OriginalKey ??= new OriginalKeyData(Keys.None); rule.TargetActionDetails ??= new TargetAction(); _rules[i] = rule; rule.LastModifiedDate = DateTime.UtcNow; SaveRules(); }
         public void DeleteRule(Guid id) { if (_rules.RemoveAll(r => r.Id == id) == 0) Debug.WriteLine($"[WARN] KS: Rule ID {id} not found for deletion."); else SaveRules(); }
 
@@ -226,63 +243,129 @@ namespace QuickFnMapper.Core.Services
         /// <returns>Current brightness percentage (0-100), or -1 if an error occurs.</returns>
         private int GetCurrentBrightness()
         {
+            string wmiNamespace = "root\\WMI";
+            string brightnessQueryString = "SELECT * FROM WmiMonitorBrightness"; // Sử dụng SELECT * để linh hoạt hơn một chút
+                                                                                 // Hoặc giữ nguyên: string brightnessQueryString = "WmiMonitorBrightness"; (nếu dùng làm tên class cho SelectQuery)
+
             try
             {
-                ManagementScope scope = new ManagementScope("root\\WMI"); // [cite: 344]
-                SelectQuery query = new SelectQuery("WmiMonitorBrightness"); // [cite: 345]
+                Debug.WriteLine($"[DEBUG] GetCurrentBrightness: Attempting to connect to WMI namespace: '{wmiNamespace}'");
+                ManagementScope scope = new ManagementScope(wmiNamespace);
+                // scope.Connect(); // Kết nối tường minh có thể giúp bắt lỗi sớm hơn, nhưng thường không cần thiết.
+
+                Debug.WriteLine($"[DEBUG] GetCurrentBrightness: Preparing WQL query: '{brightnessQueryString}'");
+                // SelectQuery query = new SelectQuery("WmiMonitorBrightness"); // Cách cũ
+                SelectQuery query = new SelectQuery(brightnessQueryString); // Cách mới để log query string
+
 
                 using (ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query))
                 {
-                    using (ManagementObjectCollection objectCollection = searcher.Get())
+                    ManagementObjectCollection? objectCollection = null;
+                    try
                     {
-                        foreach (ManagementObject mObj in objectCollection) // [cite: 346]
+                        Debug.WriteLine($"[DEBUG] GetCurrentBrightness: Attempting searcher.Get() for query: '{searcher.Query.QueryString}'");
+                        objectCollection = searcher.Get();
+                        Debug.WriteLine($"[DEBUG] GetCurrentBrightness: searcher.Get() successful. ObjectCount: {objectCollection?.Count ?? -1}");
+                    }
+                    catch (InvalidCastException iceSearcher)
+                    {
+                        Debug.WriteLine($"[FATAL_ERROR] GetCurrentBrightness: InvalidCastException during searcher.Get(). Query: '{searcher.Query.QueryString}'. Message: {iceSearcher.Message}\nStackTrace: {iceSearcher.StackTrace}");
+                        return -1;
+                    }
+                    catch (ManagementException mexSearcher) // Bắt lỗi cụ thể từ WMI
+                    {
+                        Debug.WriteLine($"[FATAL_ERROR] GetCurrentBrightness: ManagementException during searcher.Get(). Query: '{searcher.Query.QueryString}'. Message: {mexSearcher.Message}\nErrorCode: {mexSearcher.ErrorCode}\nStackTrace: {mexSearcher.StackTrace}");
+                        return -1;
+                    }
+                    catch (Exception exSearcher) // Bắt tất cả các lỗi khác từ searcher.Get()
+                    {
+                        Debug.WriteLine($"[FATAL_ERROR] GetCurrentBrightness: General Exception during searcher.Get(). Query: '{searcher.Query.QueryString}'. Message: {exSearcher.Message}\nStackTrace: {exSearcher.StackTrace}");
+                        return -1;
+                    }
+
+                    if (objectCollection == null)
+                    {
+                        Debug.WriteLine("[WARN] GetCurrentBrightness: objectCollection is null after searcher.Get() call.");
+                        return -1;
+                    }
+
+                    using (objectCollection)
+                    {
+                        if (objectCollection.Count == 0)
                         {
-                            object brightnessObj = mObj["CurrentBrightness"]; // Lấy giá trị dưới dạng object trước
-                            if (brightnessObj != null) // [cite: 347]
+                            Debug.WriteLine($"[WARN] GetCurrentBrightness: WMI query '{searcher.Query.QueryString}' returned 0 objects.");
+                            OnNotificationRequested(new NotificationEventArgs.NotificationInfo(
+                                        "Brightness Info", "No WMI monitor brightness object found. Your display might not support this feature or WMI is misconfigured.", NotificationType.Warning));
+                            return -1;
+                        }
+
+                        // Chỉ lấy giá trị từ đối tượng đầu tiên tìm thấy
+                        ManagementObject? mObj = objectCollection.Cast<ManagementObject>().FirstOrDefault();
+
+                        if (mObj == null)
+                        {
+                            Debug.WriteLine("[WARN] GetCurrentBrightness: No ManagementObject found in the collection.");
+                            return -1;
+                        }
+
+                        using (mObj)
+                        {
+                            object? brightnessPropertyValue = null;
+                            try
                             {
-                                Debug.WriteLine($"[DEBUG] GetCurrentBrightness: Raw WMI CurrentBrightness value: '{brightnessObj}', Type: '{brightnessObj.GetType().FullName}'");
-                                try
+                                brightnessPropertyValue = mObj["CurrentBrightness"];
+                                Debug.WriteLine($"[DEBUG] GetCurrentBrightness: Accessed mObj[\"CurrentBrightness\"]. Value: '{brightnessPropertyValue}'");
+                            }
+                            catch (ManagementException mexProp)
+                            {
+                                Debug.WriteLine($"[WARN] GetCurrentBrightness: Could not access 'CurrentBrightness' property from WMI object. Error: {mexProp.Message}");
+                                return -1;
+                            }
+
+                            if (brightnessPropertyValue != null)
+                            {
+                                Debug.WriteLine($"[DEBUG] GetCurrentBrightness: Raw WMI CurrentBrightness value: '{brightnessPropertyValue}', Type: '{brightnessPropertyValue.GetType().FullName}'");
+                                // (Phần logic ép kiểu đã sửa ở lần trước giữ nguyên)
+                                // ... (Thử if (brightnessPropertyValue is byte byteVal)... else if ... Convert.ToByte ... )
+                                // Quan trọng: Đảm bảo logic ép kiểu này được giữ lại và chính xác
+                                if (brightnessPropertyValue is byte byteVal) { if (byteVal <= 100) return (int)byteVal; }
+                                else if (brightnessPropertyValue is sbyte sbyteVal) { if (sbyteVal >= 0 && sbyteVal <= 100) return (int)sbyteVal; }
+                                // ... (các kiểu khác như int, short, string, v.v...)
+                                else
                                 {
-                                    // WMI CurrentBrightness thường là byte (0-100).
-                                    // Thử chuyển đổi sang byte trước, sau đó sang int.
-                                    byte byteBrightness = Convert.ToByte(brightnessObj);
-                                    return (int)byteBrightness; // An toàn hơn là Convert.ToInt32 trực tiếp
-                                }
-                                catch (FormatException fe)
-                                {
-                                    Debug.WriteLine($"[ERROR] GetCurrentBrightness: FormatException converting brightness value '{brightnessObj}'. {fe.Message}");
-                                }
-                                catch (InvalidCastException ice) // Bắt lỗi ép kiểu cụ thể
-                                {
-                                    Debug.WriteLine($"[ERROR] GetCurrentBrightness: InvalidCastException converting brightness value '{brightnessObj}'. {ice.Message}");
-                                    // Có thể thử một số cách chuyển đổi khác nếu cần, ví dụ nếu nó là string
-                                    if (brightnessObj is string strVal && byte.TryParse(strVal, out byte parsedByte))
+                                    try
                                     {
-                                        Debug.WriteLine($"[DEBUG] GetCurrentBrightness: Successfully parsed brightness string '{strVal}' to byte '{parsedByte}'.");
-                                        return (int)parsedByte;
+                                        byte convertedByte = Convert.ToByte(brightnessPropertyValue, System.Globalization.CultureInfo.InvariantCulture);
+                                        if (convertedByte <= 100) return (int)convertedByte;
+                                        Debug.WriteLine($"[WARN] GetCurrentBrightness: Converted value '{convertedByte}' is out of 0-100 range.");
+                                    }
+                                    catch (Exception convEx)
+                                    {
+                                        Debug.WriteLine($"[ERROR] GetCurrentBrightness: Final conversion to byte failed for value '{brightnessPropertyValue}'. Type: '{brightnessPropertyValue.GetType().FullName}'. Error: {convEx.Message}");
                                     }
                                 }
-                                catch (OverflowException oe)
-                                {
-                                    Debug.WriteLine($"[ERROR] GetCurrentBrightness: OverflowException converting brightness value '{brightnessObj}'. {oe.Message}");
-                                }
                             }
-                            // Chỉ cần lấy độ sáng của màn hình đầu tiên tìm thấy
-                            break;
-                        }
-                    }
-                }
-                Debug.WriteLine("[WARN] GetCurrentBrightness: WmiMonitorBrightness instance not found or CurrentBrightness property is null/unconvertible."); // [cite: 349]
+                            else
+                            {
+                                Debug.WriteLine("[WARN] GetCurrentBrightness: CurrentBrightness property value is null for the WMI object.");
+                            }
+                        } // Kết thúc using(mObj)
+                    } // Kết thúc using(objectCollection)
+                } // Kết thúc using(searcher)
+                Debug.WriteLine("[WARN] GetCurrentBrightness: No valid WMI CurrentBrightness value found after checking WMI objects.");
+                OnNotificationRequested(new NotificationEventArgs.NotificationInfo("Brightness Info", "Could not retrieve a valid brightness value from WMI.", NotificationType.Warning));
             }
-            catch (ManagementException mex) // Bắt lỗi cụ thể từ WMI
+            catch (ManagementException mexScope)
             {
-                Debug.WriteLine($"[ERROR] GetCurrentBrightness (ManagementException): {mex.Message}. ErrorCode: {mex.ErrorCode}. WMI may not be available or supported.");
+                Debug.WriteLine($"[FATAL_ERROR] GetCurrentBrightness (Outer ManagementException): {mexScope.Message}. ErrorCode: {mexScope.ErrorCode}. WMI may not be available or supported, or namespace/class is incorrect.");
+                OnNotificationRequested(new NotificationEventArgs.NotificationInfo("Brightness Error", "WMI query for brightness failed. WMI might be unavailable or misconfigured.", NotificationType.Error));
             }
-            catch (Exception ex)
+            catch (Exception ex) // Các lỗi không mong muốn khác
             {
-                Debug.WriteLine($"[ERROR] GetCurrentBrightness (General Exception): {ex.Message}"); // [cite: 350]
+                Debug.WriteLine($"[FATAL_ERROR] GetCurrentBrightness (Outer General Exception): {ex.Message} \nStackTrace: {ex.StackTrace}");
+                OnNotificationRequested(new NotificationEventArgs.NotificationInfo("Brightness Error", "An unexpected error occurred while getting brightness.", NotificationType.Error));
             }
-            return -1; // [cite: 351]
+            return -1;
         }
 
         /// <summary>
@@ -291,49 +374,117 @@ namespace QuickFnMapper.Core.Services
         /// <param name="targetBrightness">Target brightness percentage (0-100).</param>
         private void SetTargetBrightness(byte targetBrightness)
         {
-            // Đảm bảo giá trị nằm trong khoảng 0-100 (byte đã là không âm)
-            if (targetBrightness > 100) targetBrightness = 100; // [cite: 353]
+            // Đảm bảo giá trị targetBrightness nằm trong khoảng 0-100 (byte thì không âm, chỉ cần check > 100)
+            if (targetBrightness > 100)
+            {
+                Debug.WriteLine($"[WARN] SetTargetBrightness: Requested brightness {targetBrightness}% is out of range, clamping to 100%.");
+                targetBrightness = 100;
+            }
+
+            string wmiNamespace = "root\\WMI";
+            string brightnessMethodsClassName = "WmiMonitorBrightnessMethods";
+            string wqlQueryString = $"SELECT * FROM {brightnessMethodsClassName}"; // Query để lấy đối tượng có phương thức set
+
+            ManagementScope? scope = null;
+            ManagementObjectSearcher? searcher = null;
+            ManagementObjectCollection? objectCollection = null;
+            ManagementObject? mObj = null;
 
             try
             {
-                ManagementScope scope = new ManagementScope("root\\WMI"); // [cite: 354]
-                SelectQuery query = new SelectQuery("WmiMonitorBrightnessMethods"); // [cite: 355]
-                using (ManagementObjectSearcher searcher = new ManagementObjectSearcher(scope, query))
-                {
-                    using (ManagementObjectCollection objectCollection = searcher.Get())
-                    {
-                        if (objectCollection.Count == 0)
-                        {
-                            Debug.WriteLine("[WARN] SetTargetBrightness: WmiMonitorBrightnessMethods instance not found. Cannot set brightness.");
-                            OnNotificationRequested(new NotificationEventArgs.NotificationInfo(
-                                "Brightness Error", "Could not find a WMI object to control screen brightness.", NotificationType.Error));
-                            return;
-                        }
+                Debug.WriteLine($"[DEBUG] SetTargetBrightness: Attempting to connect to WMI namespace: '{wmiNamespace}'");
+                scope = new ManagementScope(wmiNamespace);
+                // Không cần scope.Connect() tường minh ở đây, nó sẽ tự kết nối khi cần.
 
-                        foreach (ManagementObject mObj in objectCollection) // [cite: 356]
-                        {
-                            // Tham số đầu tiên của WmiSetBrightness là timeout (không dùng ở đây), thứ hai là độ sáng
-                            mObj.InvokeMethod("WmiSetBrightness", new object[] { (uint)0, targetBrightness }); // [cite: 357] // Đặt timeout là 0
-                            Debug.WriteLine($"[INFO] SetTargetBrightness: Attempted to set brightness to {targetBrightness}");
-                            // Thông báo cho người dùng rằng lệnh đã được gửi, không nhất thiết phải thành công ngay
-                            // OnNotificationRequested(new NotificationEventArgs.NotificationInfo(
-                            //    "Brightness Control", $"Brightness set to {targetBrightness}%", NotificationType.Info));
-                            return; // Áp dụng cho màn hình đầu tiên tìm thấy
-                        }
-                    }
+                Debug.WriteLine($"[DEBUG] SetTargetBrightness: Preparing WQL query: '{wqlQueryString}'");
+                SelectQuery query = new SelectQuery(wqlQueryString);
+
+                searcher = new ManagementObjectSearcher(scope, query);
+
+                try
+                {
+                    Debug.WriteLine($"[DEBUG] SetTargetBrightness: Attempting searcher.Get() for query: '{searcher.Query.QueryString}'");
+                    objectCollection = searcher.Get();
+                    Debug.WriteLine($"[DEBUG] SetTargetBrightness: searcher.Get() successful. ObjectCount: {objectCollection?.Count ?? -1}");
+                }
+                catch (InvalidCastException iceSearcher)
+                {
+                    Debug.WriteLine($"[FATAL_ERROR] SetTargetBrightness: InvalidCastException during searcher.Get(). Query: '{searcher.Query.QueryString}'. Message: {iceSearcher.Message}\nStackTrace: {iceSearcher.StackTrace}");
+                    OnNotificationRequested(new NotificationEventArgs.NotificationInfo("Brightness Error", $"Failed to get WMI brightness methods (InvalidCast): {iceSearcher.Message}", NotificationType.Error));
+                    return;
+                }
+                catch (ManagementException mexSearcher)
+                {
+                    Debug.WriteLine($"[FATAL_ERROR] SetTargetBrightness: ManagementException during searcher.Get(). Query: '{searcher.Query.QueryString}'. Message: {mexSearcher.Message}\nErrorCode: {mexSearcher.ErrorCode}\nStackTrace: {mexSearcher.StackTrace}");
+                    OnNotificationRequested(new NotificationEventArgs.NotificationInfo("Brightness Error", $"WMI query for brightness methods failed (ManEx): {mexSearcher.Message}", NotificationType.Error));
+                    return;
+                }
+                catch (Exception exSearcher)
+                {
+                    Debug.WriteLine($"[FATAL_ERROR] SetTargetBrightness: General Exception during searcher.Get(). Query: '{searcher.Query.QueryString}'. Message: {exSearcher.Message}\nStackTrace: {exSearcher.StackTrace}");
+                    OnNotificationRequested(new NotificationEventArgs.NotificationInfo("Brightness Error", $"Failed to get WMI brightness methods (GenEx): {exSearcher.Message}", NotificationType.Error));
+                    return;
+                }
+
+                if (objectCollection == null || objectCollection.Count == 0)
+                {
+                    Debug.WriteLine($"[WARN] SetTargetBrightness: WMI query '{searcher.Query.QueryString}' returned 0 objects. Cannot find WmiMonitorBrightnessMethods.");
+                    OnNotificationRequested(new NotificationEventArgs.NotificationInfo("Brightness Error", "Could not find WMI object to control screen brightness (WmiMonitorBrightnessMethods not found).", NotificationType.Error));
+                    return;
+                }
+
+                // Lấy đối tượng đầu tiên từ collection (thường chỉ có một)
+                mObj = objectCollection.Cast<ManagementObject>().FirstOrDefault();
+
+                if (mObj == null)
+                {
+                    Debug.WriteLine("[WARN] SetTargetBrightness: No ManagementObject instance found in the WmiMonitorBrightnessMethods collection.");
+                    OnNotificationRequested(new NotificationEventArgs.NotificationInfo("Brightness Error", "WMI brightness method object instance not found.", NotificationType.Error));
+                    return;
+                }
+
+                // Tham số cho phương thức WmiSetBrightness:
+                // Arg0: Timeout (uint). Đặt là 0 hoặc 1 giây thường là đủ.
+                // Arg1: New Brightness (byte).
+                object[] methodArgs = new object[] { (uint)1, targetBrightness }; // Timeout 1 giây, giá trị độ sáng mới
+                string methodName = "WmiSetBrightness";
+
+                try
+                {
+                    Debug.WriteLine($"[DEBUG] SetTargetBrightness: Attempting to invoke WMI method '{methodName}' on object '{mObj.Path.Path}' with Timeout='{methodArgs[0]}' and Brightness='{methodArgs[1]}'");
+                    mObj.InvokeMethod(methodName, methodArgs);
+                    Debug.WriteLine($"[INFO] SetTargetBrightness: WMI method '{methodName}' invoked successfully to attempt setting brightness to {targetBrightness}%.");
+                    // Thông báo thành công (nếu ShowNotifications bật) sẽ được xử lý bởi ExecuteAction sau khi hàm này trả về.
+                    // Không nên raise notification thành công ở đây vì ExecuteAction sẽ làm.
+                }
+                catch (ManagementException mexInvoke)
+                {
+                    Debug.WriteLine($"[ERROR] SetTargetBrightness (ManagementException on InvokeMethod '{methodName}'): {mexInvoke.Message}. ErrorCode: {mexInvoke.ErrorCode}. WMI may not support setting brightness or parameters are invalid.");
+                    OnNotificationRequested(new NotificationEventArgs.NotificationInfo("Brightness Error", $"Failed to set brightness via WMI (Invoke ManEx): {mexInvoke.Message}", NotificationType.Error));
+                }
+                catch (Exception exInvoke)
+                {
+                    Debug.WriteLine($"[ERROR] SetTargetBrightness (General Exception on InvokeMethod '{methodName}'): {exInvoke.Message}\nStackTrace: {exInvoke.StackTrace}");
+                    OnNotificationRequested(new NotificationEventArgs.NotificationInfo("Brightness Error", $"Failed to set brightness (Invoke GenEx): {exInvoke.Message}", NotificationType.Error));
                 }
             }
-            catch (ManagementException mex)
+            catch (ManagementException mexScope) // Lỗi liên quan đến ManagementScope hoặc SelectQuery ban đầu
             {
-                Debug.WriteLine($"[ERROR] SetTargetBrightness (ManagementException): {mex.Message}. ErrorCode: {mex.ErrorCode}. WMI may not be available or brightness control not supported.");
-                OnNotificationRequested(new NotificationEventArgs.NotificationInfo(
-                   "Brightness Error", $"Failed to set brightness via WMI: {mex.Message}", NotificationType.Error));
+                Debug.WriteLine($"[FATAL_ERROR] SetTargetBrightness (Outer ManagementException): {mexScope.Message}. ErrorCode: {mexScope.ErrorCode}. WMI may not be available or supported, or namespace/class is incorrect.");
+                OnNotificationRequested(new NotificationEventArgs.NotificationInfo("Brightness Error", $"WMI setup for setting brightness failed (Outer ManEx): {mexScope.Message}", NotificationType.Error));
             }
-            catch (Exception ex)
+            catch (Exception ex) // Các lỗi không mong muốn khác ở tầng ngoài
             {
-                Debug.WriteLine($"[ERROR] SetTargetBrightness (General Exception): {ex.Message}"); // [cite: 359]
-                OnNotificationRequested(new NotificationEventArgs.NotificationInfo(
-                    "Brightness Error", $"Failed to set brightness: {ex.Message}", NotificationType.Error));
+                Debug.WriteLine($"[FATAL_ERROR] SetTargetBrightness (Outer General Exception): {ex.Message}\nStackTrace: {ex.StackTrace}");
+                OnNotificationRequested(new NotificationEventArgs.NotificationInfo("Brightness Error", $"Unexpected error while preparing to set brightness: {ex.Message}", NotificationType.Error));
+            }
+            finally // Đảm bảo giải phóng tài nguyên WMI
+            {
+                mObj?.Dispose();
+                objectCollection?.Dispose();
+                searcher?.Dispose();
+                // ManagementScope không implement IDisposable
+                Debug.WriteLine("[DEBUG] SetTargetBrightness: WMI objects disposed (if they were created).");
             }
         }
 

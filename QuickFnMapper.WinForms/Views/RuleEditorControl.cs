@@ -26,6 +26,7 @@ namespace QuickFnMapper.WinForms.Views
         // Event này có thể được Controller sử dụng để biết key đã thay đổi mà không cần phải get SelectedOriginalKey liên tục.
         // Hoặc nếu Controller không cần, có thể bỏ đi.
         public event EventHandler<OriginalKeyData>? UserSelectedOriginalKeyChanged;
+        public event EventHandler? EditorCancelled; // Implement event từ interface
 
         public RuleEditorControl()
         {
@@ -183,7 +184,12 @@ namespace QuickFnMapper.WinForms.Views
                 SelectedActionTypeChanged?.Invoke(this, selectedType); // [cite: 1057]
         }
         private void btnSaveRule_Click(object? sender, EventArgs e) { SaveRuleClicked?.Invoke(this, EventArgs.Empty); } // [cite: 1058]
-        private void btnCancelRule_Click(object? sender, EventArgs e) { CancelClicked?.Invoke(this, EventArgs.Empty); } // [cite: 1059]
+        private void btnCancelRule_Click(object? sender, EventArgs e)
+        {
+            Debug.WriteLine($"[INFO] RuleEditorControl '{this.Name}': btnCancelRule_Click fired.");
+            CancelClicked?.Invoke(this, EventArgs.Empty); // Event này cho RuleEditorController biết để gọi CloseEditor
+            EditorCancelled?.Invoke(this, EventArgs.Empty); // Event mới này cho MainController biết để điều hướng
+        }
         #endregion
 
         #region IRuleEditorView Implementation
@@ -223,8 +229,13 @@ namespace QuickFnMapper.WinForms.Views
         }
         public string ActionParameterValue
         {
-            get => txtActionParameter?.Text ?? string.Empty; // [cite: 1067]
-            set { if (txtActionParameter != null) txtActionParameter.Text = value; } // [cite: 1067]
+            get
+            {
+                string val = txtActionParameter?.Text ?? string.Empty;
+                Debug.WriteLine($"[DEBUG] RuleEditorControl.ActionParameterValue GET: Returning '{val}' from txtActionParameter."); // Thêm log ở đây
+                return val;
+            }
+            set { if (txtActionParameter != null) txtActionParameter.Text = value; }
         }
         public string? ActionParameterSecondaryValue
         {
@@ -326,6 +337,15 @@ namespace QuickFnMapper.WinForms.Views
                     mainFrm.ShowHomeControl(); // [cite: 1090] // Quay về HomeControl khi đóng
                 }
             }
+        }
+        public void CloseEditor()
+        {
+            Debug.WriteLine($"[INFO] RuleEditorControl '{this.Name}': CloseEditor called.");
+            this.Visible = false;
+            // Không tự động điều hướng ở đây. MainController sẽ quyết định.
+            // Nếu UserControl này được tạo mới mỗi lần, có thể cân nhắc Dispose ở đây
+            // hoặc để MainForm quản lý vòng đời của nó.
+            // Hiện tại, chỉ ẩn đi là đủ vì MainForm sẽ thay thế nó trong panel.
         }
 
         public event EventHandler? ViewInitialized; // [cite: 1091]

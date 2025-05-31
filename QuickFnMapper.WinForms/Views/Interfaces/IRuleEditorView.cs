@@ -87,7 +87,9 @@ namespace QuickFnMapper.WinForms.Views.Interfaces
         /// <para>Closes the rule editor view.</para>
         /// <para>Đóng view soạn thảo quy tắc.</para>
         /// </summary>
-        void CloseView(bool success);
+        /// 
+        //void CloseView(bool success);
+        void CloseEditor();
         #endregion
 
         #region Events triggered by UI actions
@@ -114,6 +116,8 @@ namespace QuickFnMapper.WinForms.Views.Interfaces
         /// <para>Xảy ra khi loại hành động được chọn thay đổi trong UI.</para>
         /// </summary>
         event EventHandler<ActionType>? SelectedActionTypeChanged; // Sửa: Thêm '?'
+
+        event EventHandler? EditorCancelled;
 
         // CaptureOriginalKeyRequested không nhất thiết phải là event nếu View tự xử lý và cập nhật SelectedOriginalKey
         // Nếu Controller cần biết khi nào việc bắt phím xảy ra, thì mới cần event này.

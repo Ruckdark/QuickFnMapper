@@ -39,11 +39,13 @@ namespace QuickFnMapper.WinForms.Controllers
             _mainController = mainController ?? throw new ArgumentNullException(nameof(mainController));
 
             // Subscribe to view events
-            _view.ViewInitialized += OnViewInitializedByView; // Sửa: Đăng ký vào event của View
+            _view.ViewInitialized += OnViewInitializedByView;
             _view.SaveRuleClicked += OnSaveRuleClicked;
-            _view.CancelClicked += OnCancelClicked;
+            _view.CancelClicked += OnCancelClicked; // OnCancelClicked sẽ gọi _view.CloseEditor()
             _view.SelectedActionTypeChanged += OnSelectedActionTypeChanged;
+            Debug.WriteLine("[DEBUG] RuleEditorController: Subscribed to view events.");
         }
+
         #endregion
 
         #region Public Methods
@@ -116,7 +118,7 @@ namespace QuickFnMapper.WinForms.Controllers
             _view.ConfigureActionParameterControls(_view.SelectedActionType);
         }
 
-        private void OnSaveRuleClicked(object? sender, EventArgs e) // Sửa: object? sender
+        private void OnSaveRuleClicked(object? sender, EventArgs e)
         {
             if (_currentRule == null)
             {
@@ -129,42 +131,78 @@ namespace QuickFnMapper.WinForms.Controllers
                 return;
             }
 
+            // Cập nhật _currentRule từ _view
             _currentRule.Name = _view.RuleName;
             _currentRule.IsEnabled = _view.IsRuleEnabled;
-            _currentRule.OriginalKey = _view.SelectedOriginalKey ?? new OriginalKeyData(Keys.None); // Đảm bảo non-null
+            // Quan trọng: Phải tạo OriginalKeyData và TargetAction mới nếu chúng null
+            // để tránh lỗi NullReferenceException khi truy cập các thuộc tính con.
+            if (_currentRule.OriginalKey == null) _currentRule.OriginalKey = new OriginalKeyData();
+            if (_currentRule.TargetActionDetails == null) _currentRule.TargetActionDetails = new TargetAction();
+
+            OriginalKeyData? viewSelectedOriginalKey = _view.SelectedOriginalKey; // Lấy giá trị từ view một lần
+            _currentRule.OriginalKey.Key = viewSelectedOriginalKey?.Key ?? Keys.None;
+            _currentRule.OriginalKey.Ctrl = viewSelectedOriginalKey?.Ctrl ?? false;
+            _currentRule.OriginalKey.Shift = viewSelectedOriginalKey?.Shift ?? false;
+            _currentRule.OriginalKey.Alt = viewSelectedOriginalKey?.Alt ?? false;
+            _currentRule.OriginalKey.Win = viewSelectedOriginalKey?.Win ?? false;
+
             _currentRule.TargetActionDetails.Type = _view.SelectedActionType;
             _currentRule.TargetActionDetails.ActionParameter = _view.ActionParameterValue;
-            _currentRule.TargetActionDetails.ActionParameterSecondary = _view.ActionParameterSecondaryValue; // Có thể null
+            _currentRule.TargetActionDetails.ActionParameterSecondary = _view.ActionParameterSecondaryValue;
             _currentRule.Order = _view.RuleOrder;
             _currentRule.LastModifiedDate = DateTime.UtcNow;
 
+            string paramFromView = _view.ActionParameterValue; // Lấy giá trị từ view
+            Debug.WriteLine($"[DEBUG] RuleEditorController.OnSaveRuleClicked: _view.ActionParameterValue BEFORE assignment = '{paramFromView}'");
+
+            _currentRule.TargetActionDetails.ActionParameter = paramFromView; // Gán vào rule
+            Debug.WriteLine($"[DEBUG] RuleEditorController.OnSaveRuleClicked: _currentRule.TargetActionDetails.ActionParameter AFTER assignment = '{_currentRule.TargetActionDetails.ActionParameter}'");
+
             try
             {
+                // Sao chép _currentRule ra một object mới để Add hoặc Update,
+                // đảm bảo _currentRule không bị thay đổi bởi service nếu có tham chiếu.
+                // Hoặc đảm bảo service không giữ tham chiếu đến rule được truyền vào sau khi xử lý.
+                // Hiện tại, KeyMappingService.AddRule và UpdateRule có vẻ không giữ tham chiếu.
+
                 if (_isNewRule)
                 {
+                    _currentRule.Id = Guid.NewGuid(); // Đảm bảo ID mới cho rule mới
                     _currentRule.CreatedDate = DateTime.UtcNow;
-                    _keyMappingService.AddRule(_currentRule);
+                    Debug.WriteLine($"[DEBUG] RuleEditorController: Attempting to Add new rule. ID: {_currentRule.Id}, Name: '{_currentRule.Name}'");
+                    _keyMappingService.AddRule(_currentRule); // Chỉ gọi AddRule
                 }
                 else
                 {
-                    _keyMappingService.UpdateRule(_currentRule);
+                    // Nếu là edit, _currentRule.Id đã có từ PrepareForEditing
+                    Debug.WriteLine($"[DEBUG] RuleEditorController: Attempting to Update rule. ID: {_currentRule.Id}, Name: '{_currentRule.Name}'");
+                    _keyMappingService.UpdateRule(_currentRule); // Chỉ gọi UpdateRule
                 }
-                _mainController.RuleEditorSaved(_currentRule);
-                _view.CloseView(true);
+
+                // Sau khi lưu thành công, _isNewRule nên được reset nếu cần,
+                // nhưng vì RuleEditorController có thể được tạo mới mỗi lần,
+                // nên trạng thái này sẽ tự reset.
+
+                _mainController.RuleSuccessfullySaved(_currentRule); // Thông báo cho MainController
+                _view.CloseEditor();                                 // Đóng editor
             }
             catch (InvalidOperationException ex)
             {
+                Debug.WriteLine($"[ERROR] RuleEditorController.OnSaveRuleClicked (InvalidOperationException): {ex.Message}");
                 _view.ShowErrorMessage(ex.Message, "Save Error");
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"[ERROR] RuleEditorController.OnSaveRuleClicked (Exception): {ex.ToString()}");
                 _view.ShowErrorMessage($"An unexpected error occurred while saving the rule: {ex.Message}", "Save Error");
             }
         }
 
-        private void OnCancelClicked(object? sender, EventArgs e) // Sửa: object? sender
+        private void OnCancelClicked(object? sender, EventArgs e)
         {
-            _view.CloseView(false);
+            Debug.WriteLine("[INFO] RuleEditorController.OnCancelClicked: Editor cancel requested by view. Closing editor.");
+            _view.CloseEditor(); // Yêu cầu view tự đóng/ẩn đi
+                                 // MainController sẽ xử lý việc điều hướng dựa trên event EditorCancelled của View.
         }
 
         private void OnSelectedActionTypeChanged(object? sender, ActionType selectedType) // Sửa: object? sender
@@ -179,6 +217,15 @@ namespace QuickFnMapper.WinForms.Controllers
                 };
                 _view.PopulateMediaKeyParameters(mediaKeyNames);
             }
+        }
+        public void UnsubscribeViewEvents()
+        {
+            if (_view != null)
+                _view.ViewInitialized -= OnViewInitializedByView;
+            _view.SaveRuleClicked -= OnSaveRuleClicked;
+            _view.CancelClicked -= OnCancelClicked;
+            _view.SelectedActionTypeChanged -= OnSelectedActionTypeChanged;
+            Debug.WriteLine("[DEBUG] RuleEditorController: Unsubscribed from view events.");
         }
         #endregion
 

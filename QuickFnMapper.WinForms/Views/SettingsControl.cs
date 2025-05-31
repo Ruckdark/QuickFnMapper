@@ -242,6 +242,9 @@ namespace QuickFnMapper.WinForms.Views
             Debug.WriteLine($"[INFO] SettingsControl '{this.Name}': PopulateApplicationThemes called. Control 'cmbAppTheme' is {(cmbAppTheme == null ? "NULL" : "NOT NULL")}");
             if (this.cmbAppTheme != null)
             {
+                // string? previouslySelectedTheme = this.cmbAppTheme.SelectedItem?.ToString(); // Lấy giá trị đang được chọn (nếu có)
+                                                                                             //mà đã được set bởi _view.ApplicationThemeView = _currentSettings.ApplicationTheme;
+
                 string? currentTheme = this.cmbAppTheme.SelectedItem?.ToString(); // 
                 Debug.WriteLine($"[INFO] SettingsControl.PopulateApplicationThemes: Current theme in ComboBox (before clear): '{currentTheme}'");
                 this.cmbAppTheme.Items.Clear(); // 
@@ -251,6 +254,11 @@ namespace QuickFnMapper.WinForms.Views
                 }
                 Debug.WriteLine($"[INFO] SettingsControl.PopulateApplicationThemes: ComboBox items repopulated with {this.cmbAppTheme.Items.Count} themes.");
 
+                //// Cố gắng khôi phục lại selection
+                //if (!string.IsNullOrEmpty(previouslySelectedTheme) && this.cmbAppTheme.Items.Contains(previouslySelectedTheme))
+                //{
+                //    this.cmbAppTheme.SelectedItem = previouslySelectedTheme;
+                //}
                 if (!string.IsNullOrEmpty(currentTheme) && this.cmbAppTheme.Items.Contains(currentTheme)) // 
                 {
                     this.cmbAppTheme.SelectedItem = currentTheme; // 

@@ -27,6 +27,8 @@ namespace QuickFnMapper.WinForms.Controllers
 
         private RuleEditorController? _ruleEditorController;
         private SettingsController? _settingsController;
+        private IRuleEditorView? _activeRuleEditorViewInstance = null; // Lưu instance của editor view đang hoạt động
+
 
         // ... các fields khác ...
         #endregion
@@ -75,14 +77,16 @@ namespace QuickFnMapper.WinForms.Controllers
 
         public void SettingsEditorSaved() // Được gọi bởi SettingsController
         {
-            // ... code hiện tại ...
+            _currentAppSettings = _appSettingsService.LoadSettings();
             _view.IsServiceEnabledUI = _currentAppSettings.IsGlobalHookEnabled;
 
-            // Sử dụng _themeManager đã có trong MainController
-            _themeManager.CheckAndApplyTheme();
+            if (_themeManager != null) // Kiểm tra null cho _themeManager
+            {
+                _themeManager.CheckAndApplyTheme(); // Áp dụng theme mới
+            }
 
             _view.ShowUserNotification("Settings applied successfully.", "Settings Saved", MessageBoxIcon.Information);
-            NavigateToHome(); // lặp thông báo
+            NavigateToHome(); 
         }
 
 
@@ -249,14 +253,39 @@ namespace QuickFnMapper.WinForms.Controllers
                 Debug.WriteLine("[ERROR] MainController.PrepareAndShowRuleEditor: ruleEditorView is null.");
                 return;
             }
-            // Tạo RuleEditorController nếu chưa có hoặc đã bị dispose
-            // if (_ruleEditorController == null || _ruleEditorController.IsDisposed) // Cần cơ chế quản lý instance controller con tốt hơn nếu chúng có state
-            // {
-            _ruleEditorController = new RuleEditorController(ruleEditorView, _keyMappingService, this);
-            // }
-            _ruleEditorController.PrepareForEditing(ruleToEdit);
-        }
 
+            // Hủy đăng ký event Cancelled từ view instance CŨ nếu có
+            if (_activeRuleEditorViewInstance != null && _activeRuleEditorViewInstance != ruleEditorView)
+            {
+                _activeRuleEditorViewInstance.EditorCancelled -= OnRuleEditor_EditorCancelled;
+            }
+
+            // Hủy đăng ký các event của RuleEditorController CŨ khỏi view (quan trọng!)
+            _ruleEditorController?.UnsubscribeViewEvents();
+
+
+            // Tạo RuleEditorController MỚI
+            _ruleEditorController = new RuleEditorController(ruleEditorView, _keyMappingService, this);
+            _ruleEditorController.PrepareForEditing(ruleToEdit);
+
+            // Đăng ký vào event Cancelled của view instance MỚI
+            _activeRuleEditorViewInstance = ruleEditorView;
+            // Đảm bảo không đăng ký trùng lặp nếu PrepareAndShowRuleEditor được gọi nhiều lần với cùng view instance
+            _activeRuleEditorViewInstance.EditorCancelled -= OnRuleEditor_EditorCancelled; // Hủy trước cho chắc
+            _activeRuleEditorViewInstance.EditorCancelled += OnRuleEditor_EditorCancelled;
+        }
+        private void OnRuleEditor_EditorCancelled(object? sender, EventArgs e)
+        {
+            Debug.WriteLine("[INFO] MainController: RuleEditor_EditorCancelled event received.");
+            if (_activeRuleEditorViewInstance != null)
+            {
+                _activeRuleEditorViewInstance.EditorCancelled -= OnRuleEditor_EditorCancelled; // Hủy đăng ký
+                _activeRuleEditorViewInstance = null;
+            }
+            // RuleEditorControl đã tự ẩn qua CloseEditor(). Giờ MainController điều hướng.
+            _view.ShowRuleListView(); // Điều hướng về trang quản lý rule
+                                      // LoadRulesIntoView(); // Không cần load lại rules vì không có gì thay đổi
+        }
         public void PrepareAndShowSettingsEditor(AppSettings currentSettings, ISettingsView settingsView)
         {
             if (settingsView == null)
@@ -271,11 +300,26 @@ namespace QuickFnMapper.WinForms.Controllers
             _settingsController.LoadAndDisplaySettingsOnView();
         }
 
-        public void RuleEditorSaved(KeyMappingRule rule)
+        //public void RuleEditorSaved(KeyMappingRule rule)
+        //{
+        //    LoadRulesIntoView();
+        //    _view.ShowUserNotification($"Rule '{rule.Name}' saved successfully.", "Rule Saved", MessageBoxIcon.Information);
+        //    NavigateToRuleManagement(null);
+        //}
+        public void RuleSuccessfullySaved(KeyMappingRule rule)
         {
+            if (rule == null) return;
+
+            // Hủy đăng ký event cancel cho editor view hiện tại vì nó sẽ đóng lại
+            if (_activeRuleEditorViewInstance != null)
+            {
+                _activeRuleEditorViewInstance.EditorCancelled -= OnRuleEditor_EditorCancelled;
+                _activeRuleEditorViewInstance = null;
+            }
+
             LoadRulesIntoView();
             _view.ShowUserNotification($"Rule '{rule.Name}' saved successfully.", "Rule Saved", MessageBoxIcon.Information);
-            NavigateToRuleManagement(null);
+            _view.ShowRuleListView();
         }
 
         public void NavigateToHome()
@@ -292,19 +336,30 @@ namespace QuickFnMapper.WinForms.Controllers
             }
             LoadRulesIntoView(); // Đảm bảo rules được cập nhật
         }
+        public void NavigateToRuleManagement()
+        {
+            _view.ShowRuleListView(); // Yêu cầu MainForm hiển thị view danh sách rule
+            LoadRulesIntoView();      // Đảm bảo danh sách rule được cập nhật
+        }
 
         // Được gọi từ MainForm khi HomeControl raise event
+        //public void OnHomeManageRulesRequested()
+        //{
+        //    // MainForm có thể có một control ListView cố định hoặc một UserControl riêng cho quản lý rule
+        //    // Ở đây, chúng ta chỉ cần yêu cầu MainForm hiển thị nó.
+        //    // MainForm sẽ tự biết control nào cần hiển thị.
+        //    if (_view is MainForm mainFormInstance)
+        //    {
+        //        // Giả sử listViewRules là một control có sẵn trên MainForm và được quản lý trong pnlMainContent
+        //        mainFormInstance.ShowUserControlInPanel(mainFormInstance.Controls.Find("listViewRules", true).FirstOrDefault());
+        //    }
+        //    LoadRulesIntoView(); // Hiển thị danh sách rules
+        //}
+
+        // Phương thức OnHomeManageRulesRequested, khi người dùng click "Manage Rules" từ Home
         public void OnHomeManageRulesRequested()
         {
-            // MainForm có thể có một control ListView cố định hoặc một UserControl riêng cho quản lý rule
-            // Ở đây, chúng ta chỉ cần yêu cầu MainForm hiển thị nó.
-            // MainForm sẽ tự biết control nào cần hiển thị.
-            if (_view is MainForm mainFormInstance)
-            {
-                // Giả sử listViewRules là một control có sẵn trên MainForm và được quản lý trong pnlMainContent
-                mainFormInstance.ShowUserControlInPanel(mainFormInstance.Controls.Find("listViewRules", true).FirstOrDefault());
-            }
-            LoadRulesIntoView(); // Hiển thị danh sách rules
+            NavigateToRuleManagement(); // Điều hướng đến view quản lý rule
         }
 
         #endregion
